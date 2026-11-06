@@ -148,7 +148,7 @@ python viewer.py --experiment "$WT_OUTPUT_ROOT/validation/z-root-cause-20261020/
 
 每个配置目录可附 `input.png` 和 `metrics.json`；后者提供 seed、裁剪比例、背景色等参数，未记录的 seed 显示为 `unknown`。选择 `Sample` 后，`Config` 多选控制并排比较；`Input / configuration` 切换对应输入图与参数，不重新加载几何。默认 full / 表面颜色，坐标按 WT camera RDF 解释，保留原尺度。不同配置使用各自 NPZ 中的 RGB，仅给 layer-0 着色。可选的 `<样本>/input.json` 沿用标准实验的 `ground_truth`、`dataset`、`evaluation_dir` 字段，相对路径以该文件目录为基准；未声明完整 GT 时页面提示缺失，不把 NPZ 的单视图 `gt_depth` 当成完整 GT。其他模型或目录布局需单独适配，不套用 WT 坐标约定。
 
-进度条显示服务器准备百分比、当前阶段和耗时（按文件任务及读取/解析/打包阶段计算），100% 表示场景已准备并提交发送，浏览器传输与渲染可能仍在继续。`View` 只控制已加载结果的显示；`Sample / Method / Config / Seed` 决定读取哪些文件。`Mesh representation` 默认 Exported GLB（纹理导出结果）；Decoded mesh 是解码器原始几何，往往更大。默认按元数据将 hybrid 恢复到它自己的 WT 预测尺度，TRELLIS 保持原生尺度；居中后按网格展示，不做 GT 配准。选择状态在已连接浏览器间共享。输出契约见本地实验方案 `docs/20261013_hybrid-baseline.md`。
+进度条显示服务器准备百分比、当前阶段和耗时（按文件任务及读取/解析/打包阶段计算），100% 表示场景已准备并提交发送，浏览器传输与渲染可能仍在继续。`View` 只控制已加载结果的显示；`Sample / Method / Config / Seed` 决定读取哪些文件。`Mesh representation` 默认 Exported GLB（纹理导出结果）；Decoded mesh 是解码器原始几何，往往更大。默认按元数据将 hybrid 恢复到它自己的 WT 预测尺度，TRELLIS 保持原生尺度；居中后按网格展示，不做 GT 配准。画布标签分行显示，完整坐标与来源说明保留在 View 选项中；Reset view 按当前窗口宽高比和视场角容纳几何及标签。选择状态在已连接浏览器间共享。输出契约见本地实验方案 `docs/20261013_hybrid-baseline.md`。
 
 在已激活环境的专用 tmux 中运行，无需 GPU。网页使用 Viser（包含在 `viz` 依赖中），Rerun 仅用于读取已有 `.rrd`：
 

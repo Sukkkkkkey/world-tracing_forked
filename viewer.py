@@ -15,6 +15,7 @@ import json
 import signal
 import threading
 import time
+import textwrap
 
 import numpy as np
 from PIL import Image
@@ -375,6 +376,24 @@ def add_camera_controls(server):
             buttons.on_click(move)
 
 
+def scene_caption(name):
+    """Keep full provenance in View; wrap only the canvas annotation."""
+    title = name.split(' [', 1)[0]
+    return '\n'.join(line for part in title.split(' / ')
+                     for line in textwrap.wrap(part, width=24))
+
+
+def fitted_camera(bounds, fov, aspect):
+    """Fit a front view to the display bounds using the client's actual frustum."""
+    bounds = np.asarray(bounds, dtype=float)
+    target = bounds.mean(axis=0)
+    half = (bounds[1] - bounds[0]) / 2
+    tangent = np.tan(fov / 2)
+    distance = max(float(half[2] + 1.15 * max(half[1] / tangent,
+                                             half[0] / (tangent * aspect))), 0.1)
+    return target, target + np.array([0., 0., distance]), distance
+
+
 def populate_viewer(server, image, geometries, input_views=None):
     """Arrange results in a centered grid at original scale, with a single-result selector."""
     server.scene.set_up_direction('+y')
@@ -401,11 +420,15 @@ def populate_viewer(server, image, geometries, input_views=None):
         return
     extents = np.array([g.bounds[1] - g.bounds[0] for g in geometries])
     gap = max(float(extents.max()) * 0.25, 0.01)
+    captions = [scene_caption(g.name) for g in geometries]
+    font_height = max(float(extents.max()) * 0.055, 1e-5)
+    caption_heights = [(caption.count('\n') + 1) * font_height * 1.3 for caption in captions]
     columns = int(np.ceil(np.sqrt(len(geometries))))
     rows = (len(geometries) + columns - 1) // columns
     # Uniform cells retain original scale and leave room for labels. Center an
     # incomplete final row instead of leaving all its empty cells on one side.
     cell_width, cell_height = extents[:, :2].max(axis=0) + gap
+    cell_height += max(caption_heights)
     entries = []
     clouds = []
     for i, (geometry, extent) in enumerate(zip(geometries, extents)):
@@ -423,30 +446,38 @@ def populate_viewer(server, image, geometries, input_views=None):
             cloud = server.scene.add_point_cloud(f'{root}/points', geometry.points + offset,
                 colors=geometry.colors, point_size=base_size, precision='float32', point_shape='circle')
             clouds.append((cloud, base_size))
-        server.scene.add_label(f'{root}/label', geometry.name, position=(0, extent[1] / 2 + gap / 3, 0))
-        entries.append((geometry.name, frame, center, extent))
+        server.scene.add_label(f'{root}/label', captions[i],
+            position=(0, extent[1] / 2 + gap / 3, 0), anchor='bottom-center',
+            font_size_mode='scene', font_scene_height=font_height)
+        # Include the annotation in framing, not just the geometry underneath.
+        label_width = max(map(len, captions[i].splitlines()), default=0) * font_height * 0.7
+        half_width = max(extent[0], label_width) / 2
+        display_bounds = center + np.array([
+            [-half_width, -extent[1] / 2, -extent[2] / 2],
+            [half_width, extent[1] / 2 + gap / 3 + caption_heights[i], extent[2] / 2]])
+        entries.append((geometry.name, frame, display_bounds))
 
     def fit_view(_=None):
-        bounds = []
-        for name, frame, center, extent in entries:
+        visible_bounds = []
+        for name, frame, bounds in entries:
             frame.visible = selection.value in ('All', name)
             if frame.visible:
-                bounds.extend((center - extent / 2, center + extent / 2))
-        bounds = np.asarray(bounds)
-        target = (bounds.min(0) + bounds.max(0)) / 2
-        distance = max(float(np.linalg.norm(bounds.max(0) - bounds.min(0))), 0.1) * 1.5
-        position = target + np.array([0, 0, distance])
-        server.initial_camera.look_at = target
-        server.initial_camera.position = position
-        server.initial_camera.near = max(distance / 10000, 1e-5)
-        server.initial_camera.far = max(distance * 10, 100)
+                visible_bounds.extend(bounds)
+        visible_bounds = np.asarray(visible_bounds)
+        bounds = np.stack((visible_bounds.min(0), visible_bounds.max(0)))
+
+        def apply(camera, aspect):
+            target, position, distance = fitted_camera(bounds, camera.fov, aspect)
+            camera.position = position
+            camera.look_at = target
+            camera.up_direction = (0, 1, 0)
+            camera.near = max(distance / 10000, 1e-5)
+            camera.far = max(distance * 10, 100)
+
+        apply(server.initial_camera, 1.0)
         for client in server.get_clients().values():
             with client.atomic():
-                client.camera.position = position
-                client.camera.look_at = target
-                client.camera.up_direction = (0, 1, 0)
-                client.camera.near = server.initial_camera.near
-                client.camera.far = server.initial_camera.far
+                apply(client.camera, client.camera.aspect)
 
     @size.on_update
     def resize_points(_):
@@ -611,13 +642,17 @@ class ExperimentViewer:
         self.worker.join(timeout=2)
 
     def move(self, offset):
-        options = tuple(self.samples)
-        if not options:
-            return
-        if self.sample.value == SELECT_SAMPLE:
-            self.sample.value = options[0 if offset > 0 else -1]
-            return
-        self.sample.value = options[(options.index(self.sample.value) + offset) % len(options)]
+        # Viser dispatches synchronous button callbacks on multiple threads.
+        # Keep read/advance/write atomic with refresh and other navigation.
+        with self.lock:
+            options = tuple(self.samples)
+            if not options:
+                return
+            current = self.sample.value
+            if current == SELECT_SAMPLE:
+                self.sample.value = options[0 if offset > 0 else -1]
+                return
+            self.sample.value = options[(options.index(current) + offset) % len(options)]
 
     def refresh(self, _=None):
         with self.lock:
@@ -964,7 +999,7 @@ def main():
         if args.port and port != args.port:
             print(f'Port {args.port} unavailable; using {port}.', flush=True)
         print(f'Viewer: http://127.0.0.1:{port}', flush=True)
-        print(f'Remote access: ssh -L {port}:127.0.0.1:{port} LiuShuqi@<server>', flush=True)
+        print(f'Remote access: ssh -L {port}:127.0.0.1:{port} ali-dsw', flush=True)
         print('Ctrl-C to stop.', flush=True)
         stopped.wait()
     finally:

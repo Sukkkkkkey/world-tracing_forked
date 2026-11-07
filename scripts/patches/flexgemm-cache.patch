@@ -1,0 +1,21 @@
+diff --git a/setup.py b/setup.py
+index 998ccf6..55e3022 100644
+--- a/setup.py
++++ b/setup.py
+@@ -92,9 +92,9 @@ def _deep_merge(base, override):
+         return merged
+     return override
+ 
+-os.makedirs(os.path.expanduser("~/.flex_gemm"), exist_ok=True)
+ src_cache_path = os.path.join(ROOT, "autotune_cache.json")
+-dst_cache_path = os.path.expanduser("~/.flex_gemm/autotune_cache.json")
++dst_cache_path = os.environ.get("FLEX_GEMM_AUTOTUNE_CACHE_PATH", os.path.expanduser("~/.flex_gemm/autotune_cache.json"))
++os.makedirs(os.path.dirname(dst_cache_path), exist_ok=True)
+ 
+ with open(src_cache_path, "r") as f:
+     src_cache = json.load(f)
+@@ -111,4 +111,3 @@ else:
+ 
+ with open(dst_cache_path, "w") as f:
+     json.dump(merged_cache, f, indent=4)
+-

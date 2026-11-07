@@ -1,0 +1,650 @@
+[
+  {
+    "identity": [
+      "20261013-P0-gso-pilot-v1",
+      "wt",
+      "defaults-v1",
+      42,
+      "42409650c248"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-P0-gso-pilot-v1",
+      "trellis2",
+      "defaults-v1",
+      42,
+      "733cae576fed"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-P0-gso-pilot-v1",
+      "wt_trellis2",
+      "defaults-v1",
+      42,
+      "032f1707770d"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-P0-gso-pilot-v1",
+      "wt_trellis2",
+      "shared-wt-v1",
+      42,
+      "a46f0414c111"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "shared-wt-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-P0-gso-pilot-v1",
+      "pixal3d",
+      "resolution1024-v1",
+      42,
+      "1369faef27f1"
+    ],
+    "parameters": {
+      "camera": "moge-2-vitl-fov-normalized-cube",
+      "camera_image_resolution": 512,
+      "config_id": "resolution1024-v1",
+      "decimation_target": 1000000,
+      "extend_pixel": 0,
+      "low_vram": true,
+      "max_num_tokens": 49152,
+      "mesh_scale": 1.0,
+      "method": "pixal3d",
+      "pipeline_type": "1024_cascade",
+      "remesh": true,
+      "remesh_band": 1,
+      "remesh_project": 0,
+      "shape_slat_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          1.0
+        ],
+        "guidance_rescale": 0.5,
+        "guidance_strength": 7.5,
+        "rescale_t": 3.0,
+        "steps": 12
+      },
+      "sparse_structure_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          1.0
+        ],
+        "guidance_rescale": 0.7,
+        "guidance_strength": 7.5,
+        "rescale_t": 5.0,
+        "steps": 12
+      },
+      "tex_slat_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          0.9
+        ],
+        "guidance_rescale": 0.0,
+        "guidance_strength": 1.0,
+        "rescale_t": 3.0,
+        "steps": 12
+      },
+      "texture_size": 4096
+    }
+  },
+  {
+    "identity": [
+      "20261013-R1-object-qual-v1",
+      "wt",
+      "defaults-v1",
+      42,
+      "42409650c248"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R1-object-qual-v1",
+      "trellis2",
+      "defaults-v1",
+      42,
+      "733cae576fed"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R1-object-qual-v1",
+      "wt_trellis2",
+      "defaults-v1",
+      42,
+      "032f1707770d"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R1-object-qual-v1",
+      "wt_trellis2",
+      "shared-wt-v1",
+      42,
+      "a46f0414c111"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "shared-wt-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R1-object-qual-v1",
+      "pixal3d",
+      "resolution1024-v1",
+      42,
+      "1369faef27f1"
+    ],
+    "parameters": {
+      "camera": "moge-2-vitl-fov-normalized-cube",
+      "camera_image_resolution": 512,
+      "config_id": "resolution1024-v1",
+      "decimation_target": 1000000,
+      "extend_pixel": 0,
+      "low_vram": true,
+      "max_num_tokens": 49152,
+      "mesh_scale": 1.0,
+      "method": "pixal3d",
+      "pipeline_type": "1024_cascade",
+      "remesh": true,
+      "remesh_band": 1,
+      "remesh_project": 0,
+      "shape_slat_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          1.0
+        ],
+        "guidance_rescale": 0.5,
+        "guidance_strength": 7.5,
+        "rescale_t": 3.0,
+        "steps": 12
+      },
+      "sparse_structure_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          1.0
+        ],
+        "guidance_rescale": 0.7,
+        "guidance_strength": 7.5,
+        "rescale_t": 5.0,
+        "steps": 12
+      },
+      "tex_slat_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          0.9
+        ],
+        "guidance_rescale": 0.0,
+        "guidance_strength": 1.0,
+        "rescale_t": 3.0,
+        "steps": 12
+      },
+      "texture_size": 4096
+    }
+  },
+  {
+    "identity": [
+      "20261013-R2-gso-quant-v1",
+      "wt",
+      "defaults-v1",
+      42,
+      "42409650c248"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R2-gso-quant-v1",
+      "trellis2",
+      "defaults-v1",
+      42,
+      "733cae576fed"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R2-gso-quant-v1",
+      "wt_trellis2",
+      "defaults-v1",
+      42,
+      "032f1707770d"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_size": 4096,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261013-R2-gso-quant-v1",
+      "pixal3d",
+      "resolution1024-v1",
+      42,
+      "1369faef27f1"
+    ],
+    "parameters": {
+      "camera": "moge-2-vitl-fov-normalized-cube",
+      "camera_image_resolution": 512,
+      "config_id": "resolution1024-v1",
+      "decimation_target": 1000000,
+      "extend_pixel": 0,
+      "low_vram": true,
+      "max_num_tokens": 49152,
+      "mesh_scale": 1.0,
+      "method": "pixal3d",
+      "pipeline_type": "1024_cascade",
+      "remesh": true,
+      "remesh_band": 1,
+      "remesh_project": 0,
+      "shape_slat_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          1.0
+        ],
+        "guidance_rescale": 0.5,
+        "guidance_strength": 7.5,
+        "rescale_t": 3.0,
+        "steps": 12
+      },
+      "sparse_structure_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          1.0
+        ],
+        "guidance_rescale": 0.7,
+        "guidance_strength": 7.5,
+        "rescale_t": 5.0,
+        "steps": 12
+      },
+      "tex_slat_sampler_params": {
+        "guidance_interval": [
+          0.6,
+          0.9
+        ],
+        "guidance_rescale": 0.0,
+        "guidance_strength": 1.0,
+        "rescale_t": 3.0,
+        "steps": 12
+      },
+      "texture_size": 4096
+    }
+  },
+  {
+    "identity": [
+      "20261020-icecream-texture-seeds-v1",
+      "wt_trellis2",
+      "defaults-v1",
+      7,
+      "2efc3a5d50fc"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_seed": 42,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_seed": 7,
+      "texture_seed_policy": "reset-python-numpy-torch-cuda-immediately-before-texture-sampler",
+      "texture_size": 4096,
+      "wt_seed": 42,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261020-icecream-texture-seeds-v1",
+      "wt_trellis2",
+      "defaults-v1",
+      42,
+      "82f15bac61ea"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_seed": 42,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_seed": 42,
+      "texture_seed_policy": "reset-python-numpy-torch-cuda-immediately-before-texture-sampler",
+      "texture_size": 4096,
+      "wt_seed": 42,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261020-icecream-texture-seeds-v1",
+      "wt_trellis2",
+      "defaults-v1",
+      123,
+      "29e92042ed34"
+    ],
+    "parameters": {
+      "alpha_erode": 2,
+      "bg_color": [
+        0,
+        0,
+        0
+      ],
+      "config_id": "defaults-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_seed": 42,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_seed": 123,
+      "texture_seed_policy": "reset-python-numpy-torch-cuda-immediately-before-texture-sampler",
+      "texture_size": 4096,
+      "wt_seed": 42,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261020-icecream-texture-seeds-v1",
+      "wt_trellis2",
+      "shared-wt-v1",
+      7,
+      "0749b3b69539"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "shared-wt-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_seed": 42,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_seed": 7,
+      "texture_seed_policy": "reset-python-numpy-torch-cuda-immediately-before-texture-sampler",
+      "texture_size": 4096,
+      "wt_seed": 42,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261020-icecream-texture-seeds-v1",
+      "wt_trellis2",
+      "shared-wt-v1",
+      42,
+      "eacd6b9723a5"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "shared-wt-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_seed": 42,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_seed": 42,
+      "texture_seed_policy": "reset-python-numpy-torch-cuda-immediately-before-texture-sampler",
+      "texture_size": 4096,
+      "wt_seed": 42,
+      "wt_steps": 20
+    }
+  },
+  {
+    "identity": [
+      "20261020-icecream-texture-seeds-v1",
+      "wt_trellis2",
+      "shared-wt-v1",
+      123,
+      "54e8be44e8f5"
+    ],
+    "parameters": {
+      "alpha_erode": 0,
+      "bg_color": [
+        128,
+        128,
+        128
+      ],
+      "config_id": "shared-wt-v1",
+      "decimation_target": 1000000,
+      "max_num_tokens": 49152,
+      "method": "wt_trellis2",
+      "pipeline_type": "1024_cascade",
+      "ray_steps": 4,
+      "shape_seed": 42,
+      "shape_steps": 12,
+      "tex_steps": 12,
+      "texture_seed": 123,
+      "texture_seed_policy": "reset-python-numpy-torch-cuda-immediately-before-texture-sampler",
+      "texture_size": 4096,
+      "wt_seed": 42,
+      "wt_steps": 20
+    }
+  }
+]

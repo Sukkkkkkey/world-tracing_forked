@@ -1,0 +1,19 @@
+{
+  "canonical_count": 1030,
+  "numpy_version": "1.26.4",
+  "seed": 20261013,
+  "pilot": {
+    "old_count": 10,
+    "new_count": 10,
+    "same_ids": true,
+    "old_only": [],
+    "new_only": []
+  },
+  "eval100": {
+    "old_count": 100,
+    "new_count": 100,
+    "same_ids": true,
+    "old_only": [],
+    "new_only": []
+  }
+}

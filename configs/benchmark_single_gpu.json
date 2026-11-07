@@ -1,0 +1,38 @@
+{
+  "seed": 42,
+  "wt_batch_sizes": [
+    1,
+    2,
+    4
+  ],
+  "wt_repeats": 2,
+  "mesh_workers": [
+    1,
+    2
+  ],
+  "wt_samples": [
+    "DPC_tropical_Trends_Hat",
+    "Frozen_Olafs_In_Trouble_PopOMatic_Game",
+    "SCHOOL_BUS",
+    "Schleich_Hereford_Bull"
+  ],
+  "mesh_samples": [
+    "SCHOOL_BUS",
+    "Frozen_Olafs_In_Trouble_PopOMatic_Game"
+  ],
+  "methods": [
+    "trellis2",
+    "wt_trellis2",
+    "pixal3d"
+  ],
+  "selection": "Fixed P0 inputs: simple School Bus and a high-face-count hybrid Frozen Olaf; WT also includes Hat and Bull.",
+  "acceptance": {
+    "min_speedup": 1.1,
+    "exact_decoded_geometry": true,
+    "exact_wt_arrays": true,
+    "gpu_memory_limit_gib": 74,
+    "instance_memory_limit_gib": 112
+  },
+  "scope": "Performance-only copies outside formal experiments; original parameters, seed and inputs unchanged.",
+  "mesh_batching": "Two independent processes on CUDA device 0, distinct per-image RNG; not a tensor batch."
+}

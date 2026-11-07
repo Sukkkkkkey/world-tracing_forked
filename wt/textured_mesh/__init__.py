@@ -36,11 +36,14 @@ from wt.textured_mesh.canon import (
     aggregate_camera_cloud,
     canon_inverse,
     compute_canonical_transform,
+    glb_to_camera,
+    GLB_TO_CANONICAL,
 )
 from wt.textured_mesh.pipeline import (
     inject_coords_into_trellis2,
     load_trellis2_pipeline,
     save_mesh_glb,
+    sparse_structure_resolution,
 )
 from wt.textured_mesh.voxelise import (
     expand_cloud_ray_xyz,
@@ -52,9 +55,12 @@ __all__ = [
     "aggregate_camera_cloud",
     "canon_inverse",
     "compute_canonical_transform",
+    "glb_to_camera",
+    "GLB_TO_CANONICAL",
     "expand_cloud_ray_xyz",
     "inject_coords_into_trellis2",
     "load_trellis2_pipeline",
     "save_mesh_glb",
+    "sparse_structure_resolution",
     "v4_ray_fill",
 ]

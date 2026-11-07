@@ -1,0 +1,12 @@
+# Preserve the tested TRELLIS.2 ABI and NumPy/OpenCV combination.
+torch==2.6.0
+torchvision==0.21.0
+numpy==1.26.4
+opencv-python==4.11.0.86
+transformers==4.57.6
+huggingface_hub==0.36.2
+flash-attn==2.7.3
+diffusers==0.37.1
+accelerate==1.13.0
+natten==0.21.0
+plyfile==1.1.3

@@ -326,6 +326,7 @@ def save_rrd(recording, path: str | os.PathLike) -> str:
     """Persist a recording to disk.  Returns the absolute path."""
     if not _HAS_RERUN:
         raise ImportError("rerun-sdk is required for visualisation.")
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
     rr.save(str(path), recording=recording)
     return str(os.path.abspath(path))
 

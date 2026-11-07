@@ -33,35 +33,40 @@ avoid name collisions between datasets that share the same clip name.
 
 ## How to use
 
-From the repo root, with the checkpoint downloaded according to
-[`checkpoints/README.md`](../../checkpoints/README.md):
+From the repo root, activate the environment and load `scripts/env.sh` as
+described in the [project README](../../README.md). Supply a local checkpoint
+or a model config name; config names download the corresponding weights.
 
 ```bash
 # Object (r75b)
 python examples/infer_rgba.py \
     --image examples/test_images/object/obj014_leather_briefcase.png \
     --ckpt  /path/to/r75b_spikeskip_hardaug.pt \
-    --out   /tmp/obj014.rrd
+    --seed  42 \
+    --out   "$WT_OUTPUT_ROOT/obj014.rrd"
 
 # Scene (r69l); for outdoor scenes with large sky, pre-mask the sky externally
 python examples/infer_scene.py \
     --image examples/test_images/scene/scene_outdoor_14_brooklyn_apartment__seed61.png \
     --ckpt  /path/to/r69l_v2_evermotion_ithappy_840_opp.pt \
-    --out   /tmp/scene_brooklyn.rrd
+    --seed  42 \
+    --out   "$WT_OUTPUT_ROOT/scene_brooklyn.rrd"
 
 # Dynamic (r76)
 python examples/infer_video.py \
-    --frames_dir examples/test_images/dynamic/davis__camel \
+    --image_dir  examples/test_images/dynamic/davis__camel \
     --ckpt       /path/to/r76_video_dynamic_16frame.pt \
-    --out        /tmp/dyn_camel.rrd
+    --seed       42 \
+    --out        "$WT_OUTPUT_ROOT/dyn_camel.rrd"
 ```
 
 Tip: append `--layer-timeline` to `infer_rgba.py` / `infer_scene.py` for
 the cumulative-layer scrubbing visualisation.
 
-## Reproducing the sample set
+## Sample provenance
 
-The samples were collected from the upstream demo-video pipeline using:
+The samples were collected by the upstream demo-video pipeline using
+`_collect_demo_samples.py` (not included in this inference repository):
 
 ```bash
 python _collect_demo_samples.py             # writes test_images/{object,scene,dynamic}/

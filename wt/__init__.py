@@ -1,5 +1,9 @@
 """World Tracing (``wt``) -- multilayer-geometry diffusion model release."""
 
+from wt.paths import configure_cache_paths
+
+configure_cache_paths()
+
 from wt.model import MultilayerXYZModel
 from wt.inference import (
     inference_diffusion,

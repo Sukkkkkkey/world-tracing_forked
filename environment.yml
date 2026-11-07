@@ -1,0 +1,11 @@
+name: world_tracing
+channels:
+  - defaults
+dependencies:
+  - python=3.11
+  - pip
+  - libgcc-ng=14.3.0=h166f726_4
+  - libstdcxx-ng=14.3.0=hc03a8fd_4
+  - libgomp=14.3.0=h4751f2c_4
+# CUDA/PyTorch and native packages are installed in order by scripts/setup_all.sh.
+# See constraints.txt, requirements.lock.txt, conda-linux-64.lock and dependencies.lock.

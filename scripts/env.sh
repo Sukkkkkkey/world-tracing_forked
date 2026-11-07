@@ -1,0 +1,30 @@
+# Source the project environment; all executable caches stay on CPFS.
+export WT_REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
+export WT_ENV_ROOT="${WT_ENV_ROOT:-$WT_REPO_ROOT/.venv}"
+export WT_DATA_ROOT="${WT_DATA_ROOT:-/mnt/oss1/lemonade_factory/SYNC/shuqiliu/data}"
+export WT_PROCESSED_ROOT="${WT_PROCESSED_ROOT:-$WT_DATA_ROOT/processed/world_tracing}"
+export WT_OUTPUT_ROOT="${WT_OUTPUT_ROOT:-/mnt/oss1/lemonade_factory/SYNC/shuqiliu/output/world_tracing}"
+export WT_WEIGHTS_ROOT="${WT_WEIGHTS_ROOT:-$WT_OUTPUT_ROOT/weights}"
+export WT_TRELLIS2_ROOT="${WT_TRELLIS2_ROOT:-$WT_REPO_ROOT/dependencies/TRELLIS.2}"
+export WT_CACHE_ROOT="${WT_CACHE_ROOT:-$WT_REPO_ROOT/.runtime/cache}"
+export HF_HOME="${HF_HOME:-$WT_WEIGHTS_ROOT/huggingface}"
+export HF_MODULES_CACHE="${HF_MODULES_CACHE:-$WT_CACHE_ROOT/huggingface/modules}"
+export HF_HUB_DISABLE_SYMLINKS_WARNING=1
+export TORCH_HOME="${TORCH_HOME:-$WT_WEIGHTS_ROOT/torch}"
+export XDG_CACHE_HOME="${XDG_CACHE_HOME:-$WT_CACHE_ROOT}"
+export PIP_CACHE_DIR="${PIP_CACHE_DIR:-$WT_CACHE_ROOT/pip}"
+export TORCH_EXTENSIONS_DIR="${TORCH_EXTENSIONS_DIR:-$WT_CACHE_ROOT/torch_extensions}"
+export FLEX_GEMM_AUTOTUNE_CACHE_PATH="${FLEX_GEMM_AUTOTUNE_CACHE_PATH:-$WT_CACHE_ROOT/flex_gemm/autotune_cache.json}"
+export TRITON_CACHE_DIR="${TRITON_CACHE_DIR:-$WT_CACHE_ROOT/triton}"
+export TMPDIR="${WT_TMP_ROOT:-$WT_REPO_ROOT/.runtime/tmp}"
+export CONDA_PKGS_DIRS="${CONDA_PKGS_DIRS:-$WT_REPO_ROOT/.runtime/conda-pkgs,$WT_REPO_ROOT/.venv/pkgs}"
+export CUDA_HOME="${WT_CUDA_HOME:-/usr/local/cuda-12.4}"
+export PATH="$WT_ENV_ROOT/bin:$CUDA_HOME/bin:$PATH"
+export PYTHONPATH="$WT_REPO_ROOT:$WT_TRELLIS2_ROOT"
+export PYTHONNOUSERSITE=1 PYTHONDONTWRITEBYTECODE=1
+export PYTHONHASHSEED="${PYTHONHASHSEED:-42}"
+export MAX_JOBS="${MAX_JOBS:-4}"
+export TORCH_CUDA_ARCH_LIST="${TORCH_CUDA_ARCH_LIST:-8.0}"
+if [ -f "$WT_REPO_ROOT/.runtime/gitconfig" ]; then
+    export GIT_CONFIG_GLOBAL="$WT_REPO_ROOT/.runtime/gitconfig"
+fi

@@ -1,0 +1,56 @@
+[
+  {
+    "wt_steps": 20,
+    "pipeline_type": "1024_cascade",
+    "ray_steps": 4,
+    "shape_steps": 12,
+    "tex_steps": 12,
+    "max_num_tokens": 49152,
+    "texture_size": 4096,
+    "decimation_target": 1000000,
+    "method": "wt",
+    "config_id": "defaults-v1",
+    "bg_color": [
+      128,
+      128,
+      128
+    ],
+    "alpha_erode": 0
+  },
+  {
+    "wt_steps": 20,
+    "pipeline_type": "1024_cascade",
+    "ray_steps": 4,
+    "shape_steps": 12,
+    "tex_steps": 12,
+    "max_num_tokens": 49152,
+    "texture_size": 4096,
+    "decimation_target": 1000000,
+    "method": "trellis2",
+    "config_id": "defaults-v1",
+    "bg_color": [
+      0,
+      0,
+      0
+    ],
+    "alpha_erode": 2
+  },
+  {
+    "wt_steps": 20,
+    "pipeline_type": "1024_cascade",
+    "ray_steps": 4,
+    "shape_steps": 12,
+    "tex_steps": 12,
+    "max_num_tokens": 49152,
+    "texture_size": 4096,
+    "decimation_target": 1000000,
+    "method": "wt_trellis2",
+    "config_id": "defaults-v1",
+    "bg_color": [
+      0,
+      0,
+      0
+    ],
+    "alpha_erode": 2
+  }
+]

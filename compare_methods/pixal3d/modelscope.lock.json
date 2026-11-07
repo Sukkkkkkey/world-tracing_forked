@@ -1,0 +1,77 @@
+{
+  "model/ckpts/shape_dec_next_dc_f16c32_fp16.json": {
+    "size": 678,
+    "sha256": "5f1b856dffce79466fb18f5f0eefc08f08c673b24b3c05b20359c0b6d318a209",
+    "revision": "bd070730abfc5a080a7a425d3ff5fc198a97c23b"
+  },
+  "model/ckpts/shape_dec_next_dc_f16c32_fp16.safetensors": {
+    "size": 948490494,
+    "sha256": "e3b718d3e43e4f8780e9a24ac6fff231811a67e3b058e336e10fe654c911d581",
+    "revision": "306eb2d5ac7e415c379af67ef0cc8143eb8e8da7"
+  },
+  "model/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.json": {
+    "size": 535,
+    "sha256": "f47fca56311959a643e8cfd2750229a2c53cbab0027406d8426cd564ce4fb5bc",
+    "revision": "d53b424ab36d41b02c2e6a4f9e170d75378c1635"
+  },
+  "model/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.safetensors": {
+    "size": 5546764048,
+    "sha256": "3e6d1df0e62bc5bc863320d1d63d6b996235eef4abb8b851e878c88f316369f1",
+    "revision": "9bc7f36d2a305e4a45d1ab3ac295aa38d70bde43"
+  },
+  "model/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.json": {
+    "size": 535,
+    "sha256": "2f7b736e8535aae96e7c41e8d123c24a14ee809fc25bea76eeac72643d21b997",
+    "revision": "7a5e7d7c20048cdc0c9e204fe9a272b289e06591"
+  },
+  "model/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.safetensors": {
+    "size": 5546764048,
+    "sha256": "63569838c1da93f010e2fa805b202ecf802cc758830230abac202a81b70e5b45",
+    "revision": "e098baaff9eceeee4e49008c3c1eb2b00e2ba1be"
+  },
+  "model/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.json": {
+    "size": 535,
+    "sha256": "f18455729d08d2ce7ef809f947ffa47f6f468b3bcf8a86473e8c326e80128ac2",
+    "revision": "7e12ff6ef1407494d0cfc0c7f7d5654ddf638b7c"
+  },
+  "model/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.safetensors": {
+    "size": 5546960656,
+    "sha256": "65df179ad02f9e92bc18335d7861fadd95f268e6249217352468dd83cb79d1d0",
+    "revision": "626f15e49a09970fe1b0dc1011469d5d05b27a19"
+  },
+  "model/ckpts/ss_dec_conv3d_16l8_fp16.json": {
+    "size": 245,
+    "sha256": "646781293f1cda74720de85d1cef50a957fb4aebd9a4bd014e454e32f2330ac5",
+    "revision": "72318a9f3c576cc47c12ee7ea29fba7e70b1d42e"
+  },
+  "model/ckpts/ss_dec_conv3d_16l8_fp16.safetensors": {
+    "size": 147591972,
+    "sha256": "1c76d4a40519aa2d711cc263a8404105231ac26db31d946bed48b84fee79009a",
+    "revision": "9a34c4fcc803d1bc702c7947c0cb05e17bc3cba6"
+  },
+  "model/ckpts/ss_flow_img_dit_1_3B_64_bf16.json": {
+    "size": 503,
+    "sha256": "2b3ef4c63b72a3de8adf745bd9d9d36b7960bdd7ba3740a6fa4d18fea6c475dd",
+    "revision": "26eff36aa0cc355e7e80e0f45dd0137492e91a7b"
+  },
+  "model/ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors": {
+    "size": 5359822584,
+    "sha256": "6d0147bb347eb61fa81c304cc68c7fd69d447e91870357a549b47e1d0fd77242",
+    "revision": "5342334183f6b8c5bb0118dacac2c99dffa20cbe"
+  },
+  "model/ckpts/tex_dec_next_dc_f16c32_fp16.json": {
+    "size": 705,
+    "sha256": "22074e4ab5b28e2b72d33a3fe61bf416134b89e12d0fc5c729f37da75da0c4d1",
+    "revision": "088430ce6987b31664991a2ad36326f4add4beb2"
+  },
+  "model/ckpts/tex_dec_next_dc_f16c32_fp16.safetensors": {
+    "size": 948458812,
+    "sha256": "97ea69addea2ecd9312910f5f548234665eef51c088386180b7cd5b258645e3c",
+    "revision": "131be67ec242f82dcfe19bb5b04c3cd67e7faa74"
+  },
+  "model/pipeline.json": {
+    "size": 4068,
+    "sha256": "1647217de06e32477702d14895e826fea73497d94537b809a53637f13482a237",
+    "revision": "a8622f355e015b8f9585a6b029dfd71caeb71a82"
+  }
+}

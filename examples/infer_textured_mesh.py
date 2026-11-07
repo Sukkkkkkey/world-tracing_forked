@@ -14,21 +14,14 @@ Usage
 
 .. code-block:: bash
 
-    # 1. Install TRELLIS.2 separately (one-time, see its README):
-    #    git clone https://github.com/microsoft/TRELLIS.2
-    #    cd TRELLIS.2
-    #    bash setup.sh --new-env --basic --flash-attn --o-voxel \\
-    #                  --nvdiffrast --cumesh --flexgemm
-    #
-    # 2. Activate the trellis2 env, then run a 4-seed sweep (default):
+    # Activate the project environment and source scripts/env.sh first.
+    object_ckpt="$(python scripts/download_object.py)"
     python examples/infer_textured_mesh.py \\
-        --image  examples/test_images/objects/case_new.png \\
-        --ckpt   hf://haoz19/object-model-6layer \\
-        --config r75b \\
-        --out    /tmp/wt_textured.glb \\
-        --trellis2-path /path/to/TRELLIS.2
+        --image examples/test_images/object/obj014_leather_briefcase.png \\
+        --ckpt "$object_ckpt" --config r75b --seed 42 \\
+        --out "$WT_OUTPUT_ROOT/wt_textured.glb"
 
-The default 4-seed sweep writes ``/tmp/wt_textured_seed{42,43,44,45}.glb``
+The default 4-seed sweep writes ``<out_stem>_seed{42,43,44,45}.glb``
 so you can compare meshes and keep the best one.  Pass ``--seed N`` (or
 ``--num-seeds 1``) to run a single deterministic seed and write to the
 plain ``--out`` path instead.
@@ -42,10 +35,13 @@ seed when this flag is set).
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import numpy as np
 import torch
+
+from wt.paths import TRELLIS2_ROOT, output_path
 
 from wt import inference_diffusion
 from wt.checkpoint import build_model_and_load_ckpt
@@ -55,9 +51,11 @@ from wt.inference import _bypass_activation_checkpointing
 from wt.textured_mesh import (
     aggregate_camera_cloud,
     compute_canonical_transform,
+    GLB_TO_CANONICAL,
     inject_coords_into_trellis2,
     load_trellis2_pipeline,
     save_mesh_glb,
+    sparse_structure_resolution,
     v4_ray_fill,
 )
 
@@ -84,18 +82,17 @@ def main():
         type=str,
         help=(
             "Checkpoint -- one of: hf://owner/repo, a bare config name "
-            "(`r75b`, `r69l`, `r76`) for the default HF repo, or a local "
-            "path to a .pt / .safetensors file."
+            "(`r75b`, `r69l`) for the default HF repo, or a local .pt path."
         ),
     )
     p.add_argument(
         "--config",
-        choices=("r75b", "r69l", "r76"),
+        choices=("r75b", "r69l"),
         default="r75b",
         help="Model config (default: r75b -- the object model).",
     )
     p.add_argument(
-        "--out", type=Path, default=Path("infer_textured.glb"), help="Output .glb"
+        "--out", type=Path, default=output_path("infer_textured.glb"), help="Output .glb"
     )
     p.add_argument(
         "--rrd",
@@ -142,8 +139,8 @@ def main():
     p.add_argument(
         "--ss-res",
         type=int,
-        default=64,
-        help="Sparse-structure voxel grid resolution (32 for 512, 64 for 1024+).",
+        default=None,
+        help="Voxel grid: auto (32 for 512/cascade, 64 for direct 1024). Must match pipeline.",
     )
     p.add_argument(
         "--ray-steps",
@@ -160,13 +157,13 @@ def main():
     p.add_argument(
         "--trellis2-model",
         type=str,
-        default="microsoft/TRELLIS.2-4B",
-        help="TRELLIS.2 HF repo id (or local path).",
+        default=None,
+        help="TRELLIS.2 HF repo or local path; default prefers prepared local weights.",
     )
     p.add_argument(
         "--trellis2-path",
         type=Path,
-        default=None,
+        default=TRELLIS2_ROOT,
         help="Path to a local TRELLIS.2 checkout (prepended to sys.path).",
     )
     p.add_argument(
@@ -178,6 +175,9 @@ def main():
     p.add_argument(
         "--texture-size", type=int, default=4096, help="Baked texture resolution."
     )
+    p.add_argument("--shape-steps", type=int, default=None, help="Override shape sampler steps.")
+    p.add_argument("--tex-steps", type=int, default=None, help="Override texture sampler steps.")
+    p.add_argument("--max-num-tokens", type=int, default=49152, help="Cascade token budget.")
     p.add_argument(
         "--decimation-target",
         type=int,
@@ -185,6 +185,15 @@ def main():
         help="Target face count after decimation (default: 1M).",
     )
     args = p.parse_args()
+    ss_res = sparse_structure_resolution(args.pipeline_type)
+    if args.ss_res is not None and args.ss_res != ss_res:
+        p.error(f"--pipeline-type {args.pipeline_type} requires --ss-res {ss_res}")
+    for name in ("shape_steps", "tex_steps", "max_num_tokens", "max_voxels", "texture_size", "decimation_target"):
+        value = getattr(args, name)
+        if value is not None and value <= 0:
+            p.error(f"--{name.replace('_', '-')} must be positive")
+    if args.ray_steps < 0:
+        p.error("--ray-steps must be nonnegative")
 
     seeds = resolve_seeds(args)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -214,12 +223,13 @@ def main():
         else torch.autocast(device_type="cpu", enabled=False)
     )
 
-    print(f"[wt] loading TRELLIS.2 pipeline ({args.trellis2_model}) ...")
+    print(f"[wt] loading TRELLIS.2 pipeline ({args.trellis2_model or 'local weights / Hub fallback'}) ...")
     pipeline = load_trellis2_pipeline(
         model_id=args.trellis2_model,
         device=device,
         trellis2_path=args.trellis2_path,
         attn_backend=args.attn_backend,
+        pipeline_type=args.pipeline_type,
     )
 
     from PIL import Image
@@ -239,6 +249,7 @@ def main():
         if device.type == "cuda":
             torch.cuda.manual_seed(seed)
         print("[wt] running diffusion sampling ...")
+        model.to(device)
         with torch.no_grad(), autocast_ctx, _bypass_activation_checkpointing(model):
             xyz_pred, mask_pred, _ = inference_diffusion(
                 model,
@@ -251,6 +262,11 @@ def main():
             )
         xyz_np = xyz_pred[0].float().cpu().numpy()
         mask_np = mask_pred[0].cpu().numpy().astype(bool)
+        # Stage 2/decoding can use the full GPU after WT inference.
+        model.cpu()
+        del xyz_pred, mask_pred
+        if device.type == "cuda":
+            torch.cuda.empty_cache()
         print(
             f"[wt] predicted XYZ {xyz_np.shape}, valid frac={mask_np.mean():.2%}"
         )
@@ -284,16 +300,13 @@ def main():
 
         cloud_cam = aggregate_camera_cloud(xyz_np, mask_np)
         if cloud_cam.size == 0:
-            print(
-                f"[wt] seed {seed}: empty point cloud -- skipping voxelisation."
-            )
-            continue
+            raise ValueError(f"seed {seed}: WT produced no finite foreground points")
         tf = compute_canonical_transform(cloud_cam, half_target=0.45)
         coords_xyz, n_vox = v4_ray_fill(
             xyz_np,
             mask_np,
             tf.apply,
-            res=args.ss_res,
+            res=ss_res,
             ray_steps=args.ray_steps,
             max_voxels=args.max_voxels,
             seed=seed,
@@ -303,8 +316,7 @@ def main():
             f"{coords_xyz.shape[0]:,})"
         )
         if coords_xyz.shape[0] == 0:
-            print(f"[wt] seed {seed}: v4_ray_fill produced 0 voxels -- skipping.")
-            continue
+            raise ValueError(f"seed {seed}: voxelisation produced no occupied cells")
 
         print(
             f"[wt] running TRELLIS.2 ({args.pipeline_type}, seed={seed}) ..."
@@ -315,7 +327,11 @@ def main():
             coords_xyz,
             seed=seed,
             pipeline_type=args.pipeline_type,
-            preprocess_image=False,  # rgba is already alpha-matted
+            preprocess_image=True,  # TRELLIS also crops and composites the alpha.
+            ss_res=ss_res,
+            shape_slat_sampler_params={"steps": args.shape_steps} if args.shape_steps else None,
+            tex_slat_sampler_params={"steps": args.tex_steps} if args.tex_steps else None,
+            max_num_tokens=args.max_num_tokens,
         )
         mesh = meshes[0]
 
@@ -326,6 +342,20 @@ def main():
             decimation_target=args.decimation_target,
         )
         print(f"[wt] wrote {out}")
+        metadata = dict(
+            image=str(args.image.resolve()), seed=seed, config=args.config,
+            pipeline_type=args.pipeline_type, ss_res=ss_res,
+            voxels_before_cap=n_vox, injected_voxels=len(coords_xyz),
+            canonical_transform=tf.to_dict(), mesh_coordinate_frame="glTF Y-up",
+            glb_to_canonical=GLB_TO_CANONICAL.tolist(),
+            decoded_vertices=len(mesh.vertices), decoded_faces=len(mesh.faces),
+            texture_size=args.texture_size, decimation_target=args.decimation_target,
+            ray_steps=args.ray_steps, max_voxels=args.max_voxels, max_num_tokens=args.max_num_tokens,
+            shape_steps=args.shape_steps or pipeline.shape_slat_sampler_params["steps"],
+            tex_steps=args.tex_steps or pipeline.tex_slat_sampler_params["steps"],
+        )
+        out.with_suffix(".json").write_text(json.dumps(metadata, indent=2) + "\n")
+        del meshes, mesh
 
 
 if __name__ == "__main__":

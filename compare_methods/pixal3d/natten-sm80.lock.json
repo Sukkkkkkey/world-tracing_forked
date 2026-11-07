@@ -1,0 +1,22 @@
+{
+  "package": "natten",
+  "version": "0.21.0",
+  "python": "3.11",
+  "torch": "2.6.0+cu124",
+  "cuda_toolkit": "12.4",
+  "cuda_arch": "8.0",
+  "filename": "natten-0.21.0-cp311-cp311-linux_x86_64.whl",
+  "bytes": 27899725,
+  "sha256": "69be4bdeb5831cac07dedd49abef6e7dcd3a84cc41fccbf54b4ccc59474b2a8b",
+  "source": {
+    "archive_info": {
+      "hash": "sha256=810aaf179e1a6fdb0a9279d7858d00412a0d3f045e546cada415205215ccd539",
+      "hashes": {
+        "sha256": "810aaf179e1a6fdb0a9279d7858d00412a0d3f045e546cada415205215ccd539"
+      }
+    },
+    "url": "https://mirrors.aliyun.com/pypi/packages/46/c9/aa6bd171aa23de07f401131ce2aff0d1cfa036e22ad8e7e8faa9d66b8067/natten-0.21.0.tar.gz"
+  },
+  "cache_path": ".runtime/cache/pixal3d/wheels/sm80/natten-0.21.0-cp311-cp311-linux_x86_64.whl",
+  "validation": "/mnt/oss1/lemonade_factory/SYNC/shuqiliu/output/world_tracing/validation/pixal3d-environment.json"
+}

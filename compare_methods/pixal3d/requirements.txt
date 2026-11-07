@@ -1,0 +1,9 @@
+# Additions to the cloned TRELLIS.2 environment; no automatic upstream upgrades.
+diffusers==0.37.1
+accelerate==1.13.0
+click==8.5.0
+matplotlib==3.11.2
+psutil==7.2.2
+cmake==3.31.10
+# MoGe-2 is imported from fixed source; NATTEN is built separately by setup.sh.
+# Gradio/training packages are not needed for the planned batch inference path.

@@ -43,3 +43,16 @@ venv/
 # OS
 .DS_Store
 Thumbs.db
+
+# Independently cloned upstream repositories; revisions recorded in dependencies.lock
+/dependencies/
+
+# Executable setup/recovery scripts are versioned.
+
+# logging
+experiments.xlsx
+experiments.xlsx.lock
+
+/.runtime/
+
+/.venv-pixal3d/

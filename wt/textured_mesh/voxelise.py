@@ -56,6 +56,13 @@ def expand_cloud_ray_xyz(
         ``(N, 3) float32`` cam-frame cloud (surface + 3D-interpolated
         interior).
     """
+    xyz = np.asarray(xyz)
+    mask = np.asarray(mask, dtype=bool)
+    if xyz.ndim != 4 or xyz.shape[-1] != 3 or mask.shape != xyz.shape[:-1]:
+        raise ValueError("Expected xyz (L, H, W, 3) and matching mask (L, H, W)")
+    if steps < 0:
+        raise ValueError("steps must be nonnegative")
+    mask = mask & np.isfinite(xyz).all(axis=-1)
     L = xyz.shape[0]
     pts_list: list[np.ndarray] = []
 
@@ -98,7 +105,7 @@ def v4_ray_fill(
         canon_apply: callable mapping camera XYZ to canonical XYZ (use
             :meth:`CanonicalTransform.apply`).
         res: voxel-grid resolution (must match the TRELLIS.2 stage you
-            feed into; 32 for ``ss_res=32``, 64 for the 1024 pipeline).
+            feed into; 32 for 512 and cascades, 64 for direct 1024).
         ray_steps: interior samples per layer-pair (see
             :func:`expand_cloud_ray_xyz`).
         close_iters: ``scipy.ndimage.binary_closing`` iterations.  Default
@@ -118,6 +125,8 @@ def v4_ray_fill(
             "v4_ray_fill requires scipy.  Install with `pip install scipy`."
         ) from exc
 
+    if res <= 0 or close_iters < 0 or (max_voxels is not None and max_voxels <= 0):
+        raise ValueError("res/max_voxels must be positive and close_iters nonnegative")
     cloud_cam = expand_cloud_ray_xyz(xyz, mask, steps=int(ray_steps))
     if cloud_cam.size == 0:
         return np.empty((0, 3), dtype=np.int32), 0

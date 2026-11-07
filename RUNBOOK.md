@@ -68,8 +68,34 @@ source scripts/env.sh
 
 ## 本轮文档与缓存整理
 
-清理采用明确的文件清单，核对实际路径、活动引用及归档摘要后执行。24 个一次性脚本已归档，权重暂存副本与正式文件 SHA 一致后清除。两套环境的 pip HTTP 缓存及空失败环境目录已清理。详细字节统计与保留项见输出 `recovery/20261107-maintenance/cleanup.json`。
+清理采用明确的文件清单，核对实际路径、活动引用及归档摘要后执行。24 个一次性脚本已归档，权重暂存副本与正式文件 SHA 一致后清除。两套环境的 pip HTTP 缓存、项目 Python/pytest 缓存及空失败环境目录已清理。详细字节统计与保留项见输出 `recovery/20261107-maintenance/cleanup.json`。
 
 项目安装、下载、推理、评价、审计和查看器的可复用入口继续由 Git 管理。正式结果、实验对照、失败重试证据、有效环境、权重、WT 父缓存和已验证 wheel 保留。
 
-viewer 合入与服务迁移的最终记录将在本轮验收后补充。
+错误命名的 `.runtime/conda-pkgs:` 目录尚有约 45.4 MB 残留，CPFS 返回 ENOTEMPTY 并保留 `.efc` 文件。当前记录标注为保留项。两套有效环境在清理后均通过依赖检查。
+
+## 查看器服务与合入验收
+
+查看器修复提交 `57565ee` 已 cherry-pick 为 main 的 `089b8a0`。旧分支保留修复历史，旧工作目录的运行记录已归档到输出 `recovery/20261107-maintenance/viewer-worktree-runtime.tar.gz` 并逐文件校验，工作目录已移除。
+
+当前服务从 `/mnt/cpfs1/shuqiliu/code/world_tracing` 启动，tmux socket 为 `wt-recovery`、会话为 `viewer-p0`、端口为 18090。PID 与命令记录在 `.runtime/viewer-service.json`，活动日志为 `.runtime/logs/viewer-p0.log`。已有服务的连接方式如下。
+
+```powershell
+ssh -N -L 127.0.0.1:18090:127.0.0.1:18090 ali-dsw
+```
+
+浏览器访问 [P0 查看器](http://127.0.0.1:18090)。启动其他实验时，先核对当前 PID 与端口，再使用对应实验目录。
+
+```bash
+cd /mnt/cpfs1/shuqiliu/code/world_tracing
+source scripts/env.sh
+CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 MKL_NUM_THREADS=2 \
+  python -uB viewer.py \
+  --experiment "$WT_OUTPUT_ROOT/experiments/20261013-P0-gso-pilot-v1" --port 18090
+```
+
+本轮全套测试 151 项通过，两个环境的依赖检查及 CUDA 检查通过。真实产物加载检查 112 项通过，包含 R2 修复样本和 3.06 GB 解码网格。详细报告、JUnit 与服务验收保存在输出 `validation/maintenance-20261107/`，执行日志保存在输出 `logs/maintenance-20261107/`。
+
+本轮两个临时核验脚本和日志已归档到输出 `recovery/20261107-maintenance/maintenance-checks-inputs.tar.gz`。恢复审计、数据处理、推理与查看器入口继续通过项目源码使用。
+
+浏览器复核记录了快速切换配置时的两条 Viser 组件更新错误，最终选择与模型显示正常。该问题及控制台信息保存在输出 `validation/maintenance-20261107/viewer-browser.json`，后续修改查看器时需复查。

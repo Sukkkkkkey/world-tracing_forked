@@ -15,4 +15,5 @@ if ! python -c 'import importlib.metadata as m; assert [m.version(n) for n in ("
 fi
 python -m pip install torch==2.6.0 torchvision==0.21.0 --index-url "$PIP_INDEX_URL"
 python -m pip install --index-url "$PIP_INDEX_URL" -e '.[viz,bg,textured-mesh,experiments]' ninja packaging wheel setuptools pytest cmake==3.31.10 imageio imageio-ffmpeg tqdm easydict tensorboard pandas lpips zstandard
+python -B scripts/setup_viser_client.py
 python -m pip check

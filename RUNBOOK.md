@@ -98,4 +98,34 @@ CUDA_VISIBLE_DEVICES= OMP_NUM_THREADS=2 OPENBLAS_NUM_THREADS=2 MKL_NUM_THREADS=2
 
 本轮两个临时核验脚本和日志已归档到输出 `recovery/20261107-maintenance/maintenance-checks-inputs.tar.gz`。恢复审计、数据处理、推理与查看器入口继续通过项目源码使用。
 
-浏览器复核记录了快速切换配置时的两条 Viser 组件更新错误，最终选择与模型显示正常。该问题及控制台信息保存在输出 `validation/maintenance-20261107/viewer-browser.json`，后续修改查看器时需复查。
+初次浏览器验收记录的两条组件更新错误已完成独立复现和修复，初始记录保存在输出 `validation/maintenance-20261107/viewer-browser.json`。修复后的回归结果与使用要求见下一节。
+
+## Viser 前端修复与重建
+
+Viser 1.1.1 把属性更新积累到消息批次末尾执行，组件删除在收到消息时立即执行。快速刷新输入图片可使同一批次同时包含属性更新和删除，导致属性更新指向已删除的组件。`scripts/patches/viser-gui-lifecycle.patch` 在组件、面板或模态框删除时清除该 UUID 之前积累的更新，重新创建后的更新仍按顺序执行。
+
+`scripts/setup_base.sh` 自动调用 `scripts/setup_viser_client.py`。安装器检查项目环境、Viser 版本、源文件与依赖锁摘要，在项目构建目录完成前端测试、类型检查与打包后发布文件。原始前端保存在 `.runtime/cache/viser-client-original/`，已安装构建的摘要和工具版本记录在 Viser 的 `client/build/wt-gui-lifecycle.json`。重复执行会校验并复用有效构建，升级 Viser 时需同步复核补丁和锁文件。
+
+首次构建需要 Node.js ≥24 与 npm。工具位于 PATH 时可直接执行以下命令。
+
+```bash
+cd /mnt/cpfs1/shuqiliu/code/world_tracing
+source scripts/env.sh
+python -B scripts/setup_viser_client.py
+```
+
+本服务器构建使用 Node.js 24.22.1 和 npm 11.6.3。Node 复用现有 VS Code Server 二进制，npm 来自官方注册表且已核验 SHA-512。需要重建时可指定当前工具路径。
+
+```bash
+cd /mnt/cpfs1/shuqiliu/code/world_tracing
+source scripts/env.sh
+export WT_NODE_BINARY=/root/.vscode-server/cli/servers/Stable-c4453f8ea430795f941c1b2ff6c9321135a74a02/server/node
+export WT_NPM_CLI="$PWD/.runtime/toolchains/npm-11.6.3/bin/npm-cli.js"
+python -B scripts/setup_viser_client.py
+```
+
+升级 VS Code Server 或更换机器后，将 `WT_NODE_BINARY` 指向可用的 Node.js，`WT_NPM_CLI` 指向 npm 的 JavaScript CLI 文件。构建成功后重启查看器并刷新浏览器页面即可加载新前端。
+
+2026-11-07 验收完成。原版 8 项专项回归中 6 项失败，修复后 8 项全部通过。前端完整测试 726 项、Python 完整测试 156 项通过，TypeScript、Vite、依赖检查和历史恢复源码校验通过。浏览器完成三组连续操作，共 23 次，覆盖样本、质量、颜色、真值、翻页和刷新，随后恢复 full 显示。控制台错误为 0，五项结果与一项真值均显示正常。
+
+验收报告、安装摘要、浏览器截图、JUnit 和原版失败证据位于输出 `validation/viewer-gui-fix-20261107/`，任务日志位于输出 `logs/viewer-gui-fix-20261107/`。

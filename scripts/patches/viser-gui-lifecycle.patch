@@ -1,0 +1,15 @@
+--- a/src/MessageHandler.tsx
++++ b/src/MessageHandler.tsx
+@@ -1131 +1131 @@
+-      const guiUpdates: { uuid: string; updates: { [key: string]: any } }[] =
++      let guiUpdates: { uuid: string; updates: { [key: string]: any } }[] =
+@@ -1134,0 +1135,9 @@
++        // Discard queued props when their component is removed. Applying them
++        // at the end of this batch would address a deleted or recreated widget.
++        if (
++          msg.type === "GuiRemoveMessage" ||
++          msg.type === "GuiPanelRemoveMessage" ||
++          msg.type === "GuiCloseModalMessage"
++        ) {
++          guiUpdates = guiUpdates.filter(({ uuid }) => uuid !== msg.uuid);
++        }

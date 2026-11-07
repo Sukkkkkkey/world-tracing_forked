@@ -54,7 +54,7 @@ experiments = [
 ]
 viz = [
     "rerun-sdk>=0.22,<0.23",
-    "viser>=1.1.1,<1.2",
+    "viser==1.1.1",  # Reviewed frontend lifecycle patch in setup_viser_client.py.
     "scipy>=1.11",
 ]
 # Foreground matting for object inputs (ZhengPeng7/BiRefNet_HR, MIT).

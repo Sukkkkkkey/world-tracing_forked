@@ -69,6 +69,8 @@ source scripts/env.sh
 
 [environment.yml](environment.yml) 声明基础环境，[requirements.recovery.txt](requirements.recovery.txt) 固定迁移前可移植包版本，[constraints.txt](constraints.txt) 引用这些约束，[dependencies.lock](dependencies.lock) 锁定外部源码。[requirements.lock.txt](requirements.lock.txt) 已在新环境验收后重新导出，记录本机实际版本和安装来源；跨机器重建使用安装脚本和固定来源清单，不能直接照搬其中的本机路径。
 
+Viser 固定为 1.1.1，并通过 `scripts/setup_viser_client.py` 安装快速切换配置的前端修复。`setup_all.sh` 会自动调用该步骤，首次构建需要 Node.js ≥24 和 npm，已验证的构建可直接复用。自定义工具位置使用 `WT_NODE_BINARY` 与 `WT_NPM_CLI`，重建与验收说明见 [查看器前端修复](/mnt/cpfs1/shuqiliu/code/world_tracing/RUNBOOK.md#viser-前端修复与重建)。
+
 Pixal3D 使用同级源码 `../Pixal3D` 和独立环境 `.venv-pixal3d`。详见 [对比方法接入](compare_methods/README.md)。
 
 ## 存储路径

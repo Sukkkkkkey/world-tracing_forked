@@ -1,5 +1,7 @@
 # TRELLIS.2 hybrid 基线实验
 
+本文保留 2026-10-13 的初始实验设计，路径已更新到当前服务器。随后加入的 Pixal3D 和已执行对照，以及最新完成数量和指标见 [恢复结果](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_recovery-results.md)。
+
 日期：2026-10-13。目的：比较 **WT、TRELLIS.2、WT + TRELLIS.2 hybrid** 的默认输出，再用单因素实验检查各方法的参数影响。模型推理采用固定 seed 的单次结果；不是论文 best-of-8 数值复现。
 
 ## 1. 实验内容
@@ -10,7 +12,7 @@
 | P0 协议调试 | GSO 独立 10 个物体，每物体 1 张固定视图 | 核验渲染/评价协议，并进行参数扫描；不纳入正式均值 |
 | R2 定量 | GSO 独立 100 个物体，每物体 1 张固定视图 | 只运行三方法默认基线，沿用 Table 1 指标类别 |
 
-GSO 原始数据固定存于 `/home/LiuShuqi/Workspace/data/world_tracing/raw/gso/`，**全部 1030 个资产下载、解压和校验完成后才推进 GSO 实验**。按有效 asset ID 排序，用 `PCG64(20261013)` 打乱一次，前 10 个为 P0、接着 100 个为 R2，其余保留；若均有效，即 10/100/920。清单在模型推理前冻结，三方法共享输入与视图；失败样本不替换，正式集不参与调参。
+GSO 原始数据固定存于 `/mnt/oss1/lemonade_factory/SYNC/shuqiliu/data/raw/gso/`，**全部 1030 个资产下载、解压和校验完成后才推进 GSO 实验**。按有效 asset ID 排序，用 `PCG64(20261013)` 打乱一次，前 10 个为 P0、接着 100 个为 R2，其余保留；若均有效，即 10/100/920。清单在模型推理前冻结，三方法共享输入与视图；失败样本不替换，正式集不参与调参。
 
 ## 2. 对比方法与配置
 
@@ -59,7 +61,7 @@ GSO 输入按固定相机渲染：1024²、FoV 40°、俯仰 20°、逐资产固
 - 视图、GT 配准采样、GT 评测采样、预测采样、bootstrap 各用 `SHA256("20261013|用途|asset_id")` 前 8 个十六进制位派生独立 seed；保存实际 seed、视图和点样本，任务顺序不改变结果。首轮不选择最佳 seed。
 - 冻结输入/split 哈希、代码快照、依赖提交与环境、权重来源/校验、实际模型/预处理/sampler/渲染/配准参数、GPU与精度设置。固定种子不等于承诺不同 CUDA/硬件位级一致；不确定性限制随配置记录。
 - 模型常驻分阶段批处理：一次加载 WT 完成点图缓存，再一次加载 TRELLIS 生成原生与 hybrid；不逐图重新加载。成功标记、输入和配置哈希用于断点续跑。
-- 输出：`/data1/LiuShuqi/output/world_tracing/experiments/<实验>/samples/<样本>/<方法>/<配置>/seed-0042/`；Viser 使用 `--experiment` 按样本/方法/配置/seed 比较。
+- 输出：`/mnt/oss1/lemonade_factory/SYNC/shuqiliu/output/world_tracing/experiments/<实验>/samples/<样本>/<方法>/<配置>/seed-0042/`；Viser 使用 `--experiment` 按样本/方法/配置/seed 比较。
 - 汇总：仓库根目录 `experiments.xlsx`，记录两轮实验名称、参数、逐样本指标、汇总与失败原因；JSON/CSV 为可重建的数据源。方案仅保留设计，执行进度/日志记入 RUNBOOK、PROGRESS。
 
 ---
@@ -167,12 +169,12 @@ GT 正深度、mask、有限性规则固定；交集外不能静默消失，另�
 代码存于仓库，方案遵循 `docs/AGENTS.md` 仅在本地保留；数据、权重、实验日志和产物都在 `/data1` 的项目目录。用户已明确授权将 GSO 下载解压至 `data/world_tracing/raw/gso/`；完整校验后原始内容只读，派生副本另存。
 
 ```text
-/data1/LiuShuqi/data/world_tracing/raw/gso/  # ~/Workspace/data/world_tracing/raw/gso/
+/mnt/oss1/lemonade_factory/SYNC/shuqiliu/data/raw/gso/
 ├── archives/                             # 1030 个固定版本原始 ZIP、SHA-256 清单
 ├── objects/<asset_id>/                   # 原样解压的网格、材质、纹理、元数据、缩略图
 ├── integrity/                            # 逐资产及逐文件校验
 └── COMPLETE.json                         # 全部验证成功后才生成；实验启动前必须检查
-/data1/LiuShuqi/output/world_tracing/
+/mnt/oss1/lemonade_factory/SYNC/shuqiliu/output/world_tracing/
 ├── datasets/gso/source/                   # 原站未完整 ZIP、清单与镜像比对证据
 ├── datasets/gso/assets/                   # 兼容材质路径的派生副本，不修改 raw 内容
 └── experiments/
@@ -202,7 +204,7 @@ GT 正深度、mask、有限性规则固定；交集外不能静默消失，另�
     │   │       └── run.log
     │   └── summary/                      # 后续评测阶段：对比图、CSV、聚合 JSON
     └── 20261013-R2-gso-quant-v1/          # 同构目录
-/data1/LiuShuqi/code/world_tracing/experiments.xlsx  # 跨两轮汇总，不存原始张量
+/mnt/cpfs1/shuqiliu/code/world_tracing/experiments.xlsx  # 跨两轮汇总，不存原始张量
 ```
 
 不要求每方法生成所有文件。当前入口生成 input/config/run、WT NPZ、mesh/decoded mesh、mesh 元数据、runtime 和日志；`metrics.json`、renders、summary 由后续评测生成，缺失不伪造为空成绩。所有 hybrid 通过 `wt_parent.json` 引用 `_cache/wt` 内的实际 NPZ 与哈希；shared-WT 通过相同背景/腐蚀/步数/seed 命中原生 WT 的同一缓存，不复制上游大张量。不同内容输入、不同预处理不能复用，字节完全相同的输入可跨 sample ID 复用。
@@ -256,7 +258,7 @@ GSO 的 GT-aligned 预览留待评测器产出配准矩阵后接入，当前 vie
 
 ## 附录 E：工作簿字段
 
-工作簿路径为 `/data1/LiuShuqi/code/world_tracing/experiments.xlsx`；已加入当前仓库 `.gitignore`。随执行进度更新，尚未完成的指标保留空值并写明原因。
+工作簿路径为 `/mnt/cpfs1/shuqiliu/code/world_tracing/experiments.xlsx`；已加入当前仓库 `.gitignore`。随执行进度更新，尚未完成的指标保留空值并写明原因。
 
 | Sheet | 内容与粒度 |
 | --- | --- |

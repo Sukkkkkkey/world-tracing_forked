@@ -53,7 +53,7 @@ viewer_utils/               查看器文件格式与数据布局适配
 
 ## 环境与安装
 
-当前服务器使用项目内独立环境 `.venv`（Python 3.11、PyTorch 2.6.0 / CUDA 12.4），GPU 为 A100 80GB（SM80）。旧服务器的安装与实验记录保留在 RUNBOOK，当前状态见 PROGRESS 顶部。
+当前服务器使用项目内独立环境 `.venv`（Python 3.11、PyTorch 2.6.0 / CUDA 12.4），GPU 为 A100 80GB（SM80）。安装与执行入口见 RUNBOOK，当前状态见 PROGRESS。旧服务器及恢复过程记录在 [项目历史](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261107_project-history.md)。
 
 2026-11-07 已完成 621 项实验恢复及工作簿发布，包括 P0、R1、R2 和既有两组对照。新旧数值差异、质量失败、单卡执行策略和验收限制均有记录。[恢复结果报告](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_recovery-results.md)
 

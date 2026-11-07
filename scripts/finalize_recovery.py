@@ -9,6 +9,7 @@ import math
 from pathlib import Path
 import shutil
 import statistics
+import subprocess
 
 from evaluation.research_workbook import export, _load_annotations
 from wt.experiment import atomic_json, file_digest, read_json
@@ -90,17 +91,35 @@ def publish_workbook():
         updated_links=link_changes)
 
 
-def main(publish):
+def verify_reviewed_sources(source_ref=None):
+    """Verify the recorded recovery source against a fixed Git commit."""
+    review_path = AUDITS / 'source-review.json'
+    lock = read_json(REPO / 'configs/recovery_source.json')
+    assert file_digest(review_path) == lock['review_sha256'], 'Recovery source review changed'
+    review = read_json(review_path)
+    assert review['status'] == 'reviewed'
+    revision = source_ref or lock['commit']
+    command = ['git', '-C', str(REPO)]
+    commit = subprocess.check_output(
+        command + ['rev-parse', '--verify', '--end-of-options', revision + '^{commit}'],
+        text=True).strip()
+    for record in review['files']:
+        path = Path(record['path'])
+        assert not path.is_absolute() and '..' not in path.parts, record['path']
+        contents = subprocess.check_output(
+            command + ['show', commit + ':' + path.as_posix()])
+        assert hashlib.sha256(contents).hexdigest() == record['current_sha256'], record['path']
+    return commit
+
+
+def main(publish, source_ref=None):
     recipe = read_json(REPO / 'configs/recovery_experiments.json')
     from scripts.check_recovery_performance import check, DECISION
     performance = check()
     reviewed_schedulers = {file_digest(DECISION): performance}
     for revision in performance.get('accepted_prior_decisions', []):
         reviewed_schedulers[revision['sha256']] = read_json(Path(revision['path']))
-    source_review = read_json(AUDITS / 'source-review.json')
-    assert source_review['status'] == 'reviewed'
-    for record in source_review['files']:
-        assert file_digest(REPO / record['path']) == record['current_sha256'], record['path']
+    source_revision = verify_reviewed_sources(source_ref)
     execution = {}
     execution_details = []
     for spec in recipe['experiments']:
@@ -236,6 +255,7 @@ def main(publish):
         performance_decision_sha256=file_digest(DECISION), execution_sha256=execution,
         execution_details=execution_details, r2_depth_review=depth_review,
         r2_pixal_longest_exports=pixal_timings[:5],
+        source_revision=source_revision,
         source_review_sha256=file_digest(AUDITS / 'source-review.json'),
         finalizer_sha256=file_digest(Path(__file__)),
         workbook=workbook, historical_comparison_sha256=file_digest(AUDITS / 'historical-comparison.json'),
@@ -325,7 +345,8 @@ def main(publish):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--publish-workbook', action='store_true')
+    parser.add_argument('--source-ref', help='Git revision matching the recorded recovery source')
     args = parser.parse_args()
     with (REPO / '.runtime/recovery-gpu.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        main(args.publish_workbook)
+        main(args.publish_workbook, args.source_ref)

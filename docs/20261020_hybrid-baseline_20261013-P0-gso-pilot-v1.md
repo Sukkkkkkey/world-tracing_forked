@@ -1,6 +1,7 @@
 # P0 基线分析与深度诊断
 
-> 2026-11-07 历史记录说明  
+> 2026-11-07 历史记录说明
+>
 > 本文保留旧服务器实验的数值、分析和当时路径。新服务器已完成重跑并更新 experiments.xlsx，最新数值、差异和验收记录见 [恢复结果报告](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_recovery-results.md)。
 
 2026-10-20。主体分析 `20261013-P0-gso-pilot-v1`：固定 10 个 GSO 调试样本，WT、TRELLIS.2、hybrid、Pixal3D，以及 shared-WT hybrid 对照，共 50 项；均单视图、seed=42。深度诊断另引用 R2 的 100 个样本，两个集合分开统计。P0 不用于总体显著性或原论文 Table 1 的复现结论。

@@ -1,6 +1,7 @@
 # R2：GSO 正式集定量与逐样本分析
 
-> 2026-11-07 历史记录说明  
+> 2026-11-07 历史记录说明
+>
 > 本文保留旧服务器实验的数值、分析和当时路径。新服务器已完成重跑并更新 experiments.xlsx，最新数值、差异和验收记录见 [恢复结果报告](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_recovery-results.md)。
 
 分析日期：2026-10-20。范围仅为 **`20261013-R2-gso-quant-v1`：100 个固定 GSO 物体 × WT、TRELLIS.2、WT + TRELLIS.2 hybrid、Pixal3D，共 400 项**。每物体一个固定视图，推理 seed=42；P0、R1、参数扫描和其他 seed 不并入。沿用 [P0 分析](20261020_hybrid-baseline_20261013-P0-gso-pilot-v1.md) 的“汇总 → 关键现象 → 逐样本”结构。

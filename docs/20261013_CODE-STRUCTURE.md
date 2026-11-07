@@ -163,7 +163,7 @@ from pathlib import Path
 import trimesh
 from wt.textured_mesh import CanonicalTransform, glb_to_camera
 
-path = Path("/data1/LiuShuqi/output/world_tracing/validation/hybrid-512/briefcase.glb")
+path = Path("/mnt/oss1/lemonade_factory/SYNC/shuqiliu/output/world_tracing/experiments/20261013-P0-gso-pilot-v1/samples/SCHOOL_BUS/wt_trellis2/defaults-v1/seed-0042/mesh.glb")
 meta = json.loads(path.with_suffix(".json").read_text())
 tf = CanonicalTransform(**meta["canonical_transform"])
 scene = trimesh.load(path, force="scene", process=False)

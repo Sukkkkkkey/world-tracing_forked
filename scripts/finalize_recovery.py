@@ -60,7 +60,9 @@ def summarize(root, audit):
 
 
 def publish_workbook():
-    destination = REPO / 'experiments.xlsx'
+    destination = REPO / '.runtime/experiments-protocolv0-regenerated.xlsx'
+    if not destination.exists():
+        shutil.copy2(REPO / 'docs/archived/20261110_experiment_baseline_protocol_v0.xlsx', destination)
     original_hash = file_digest(destination)
     before = _load_annotations(destination)
     temporary = REPO / '.runtime/experiments.recovered.xlsx'
@@ -301,7 +303,7 @@ def main(publish, source_ref=None):
     lines += ['', '## 单卡执行策略', '',
         'R2 前的固定小样本测试测得，WT batch=2/4 吞吐提高约 5%–7%，同时 XYZ 出现数值差异。正式运行采用 WT batch=1。按完整样本分配的 TRELLIS.2 / hybrid 两进程测得 1.530 倍吞吐，Pixal 两进程测得 1.511 倍吞吐，测试中的解码几何及导出前纹理一致。',
         '', '正式阶段通常约每两秒采样整卡显存和实例工作集。单次 GPU 查询限时十秒，连续三次查询失败或资源达到门槛时停止自己的工作进程。查询与资源余量恢复后，归档不完整尝试并串行重试。首轮 R2 因查询超时异常退出，v2 修复通过十四项回归。原尝试、旧版本决策、实际退出码和耗时均已归档。',
-        '', f"- [单卡测试与决策]({REPO / 'docs/20261105_single-gpu-batch-review.md'})",
+        '', f"- [单卡测试与决策]({REPO / 'docs/archived/20261105_recovery-results.md'})",
         f"- [复核决策与证据摘要]({DECISION})",
         '', 'R2 两个 hybrid 在并行及原方案串行重试中均显存不足。修复采用历史方案中的独立行 LayerNorm 分块、同序拓扑分块和用后缓存释放，配置身份审计通过。59 个 CUDA 算例、自动求导回退及十三项文件保护测试通过，两个固定完整预训练样本的解码网格与导出前几何、纹理张量逐元素一致。两个失败 run 已重跑，各自新 WT 父缓存与原数组及 RGBA 精确相同。另外 298 个基线 run 的 1,689 个文件前后哈希一致。原失败日志和内存策略来源均有记录。',
         f"- [内存策略验证及决定]({AUDITS / '20261013-R2-gso-quant-v1/memory-policy-decision.json'})",
@@ -335,10 +337,10 @@ def main(publish, source_ref=None):
         f"- [迁移前后核心代码复核]({AUDITS / 'source-review.json'})",
         f"- [总验收记录]({AUDITS / 'final.json'})",
         f"- [工作簿数值与来源审计]({AUDITS / 'workbook.json'})",
-        f"- [实验工作簿]({REPO / 'experiments.xlsx'})",
+        f"- [实验工作簿]({REPO / '.runtime/experiments-protocolv0-regenerated.xlsx'})",
         f"- [环境与执行记录]({REPO / 'RUNBOOK.md'})", '']
     if publish:
-        (REPO / 'docs/20261105_recovery-results.md').write_text(chr(10).join(lines))
+        (AUDITS / 'recovery-results-regenerated.md').write_text(chr(10).join(lines))
     print(json.dumps(report, ensure_ascii=False, indent=2))
 
 

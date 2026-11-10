@@ -93,6 +93,7 @@ rerun-sdk==0.22.1
 rich==14.3.4
 ruamel.yaml @ file:///croot/ruamel.yaml_1727980156079/work
 ruamel.yaml.clib @ file:///croot/ruamel.yaml.clib_1727769819935/work
+rtree==1.4.1
 safetensors==0.8.0
 scipy==1.17.1
 setuptools==75.1.0

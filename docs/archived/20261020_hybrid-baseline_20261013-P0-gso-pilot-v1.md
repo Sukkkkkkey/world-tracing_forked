@@ -105,7 +105,7 @@ WT 与 Pixal3D 的 CD-L1 均值仅差约 `1.05e-6`；逐样本 WT 在 7/10 项�
 Mesh 纹理4096、GLB decimation target=1,000,000；shape/texture guidance=7.5/1.0。Pixal3D 为1024配置，不是其上游默认1536或 Direct3D-S2 分支。有效参数以各项 `config.json` 和[源码锁](../compare_methods/pixal3d/sources.lock)为准；通用 JSON 中原生 TRELLIS.2 的 WT/腐蚀/ray 参数不参与执行。Hybrid Stage 2 仍接收图像条件，不能称为没有纹理条件。
 
 - **随机性：** 推理 seed=42、batch=1，每样本在对应 pipeline 入口重置 RNG；跨方法同 seed 不等于同 latent。划分 seed=20261013；视图、采样 seed 按用途和 asset_id 派生，保存在 `camera.json` / `metrics.json`，无 best-of-N。
-- **形状：** `gso-shape-sim3-v1`，GT 资产 AABB 对角线=1；24个 proper rotation 初始化、最多100次 ICP，允许正尺度，禁止镜像。配准10,000点、评价100,000点分开；WT 有效点去重抽样，mesh 按面积采样。CD-L1/L2 分别为双向最近邻欧氏/平方欧氏距离均值的平均，含 `1/2`。完整定义见[评价协议](evaluation_protocol.md)。
+- **形状：** `gso-shape-sim3-v1`，GT 资产 AABB 对角线=1；24个 proper rotation 初始化、最多100次 ICP，允许正尺度，禁止镜像。配准10,000点、评价100,000点分开；WT 有效点去重抽样，mesh 按面积采样。CD-L1/L2 分别为双向最近邻欧氏/平方欧氏距离均值的平均，含 `1/2`。完整定义见[评价协议](evaluation_protocol_v0.md)。
 - **产物：** 形状评测使用 `decoded_mesh.ply`，早于 GLB 导出，但 `decode_latent()` 内已调用 `fill_holes()`；缺陷在该文件中出现只能排除 GLB 导出是唯一来源。
 - **核验：** 50项形状指标由保存的评价点与配准重算，差异≤`1e−10`；10/10 GT RGB 重渲染与原输入逐像素一致。证据图按保存坐标变换绘制，无单例手工旋转；WT 用点云，GT/生成结果用 mesh，Hat/MEAT 另有同表示对照。纹理图仅显示 base color。
 

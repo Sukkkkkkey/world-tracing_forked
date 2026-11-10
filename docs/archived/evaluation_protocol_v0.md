@@ -1,6 +1,6 @@
 # 定量评估协议
 
-代码核对日期：2026-10-20。本文维护当前 GSO 评测实现的计算定义、适用范围和复现约定；实验成绩与逐样本记录见 `experiments.xlsx`，案例分析见 `docs/`。本协议由项目自行定义，不能直接视为原论文 Table 1 的同协议复现。
+代码核对日期为 2026-11-08。本文维护当前 GSO 评测实现的计算定义、适用范围和复现约定。CD、相机与 SSI 深度成绩见 `experiments.xlsx`，多视角几何结果见实验目录的 `multiview.json` 及输出根目录的 `evaluation/multiview/<revision>/<experiment>/summary.json`。案例分析见 `docs/`。本协议由项目自行定义，不能直接视为原论文 Table 1 的同协议复现。
 
 ## 1. 协议概览
 
@@ -9,10 +9,12 @@
 | `gso-shape-sim3-v1` | GT 辅助旋转、平移、正等比缩放 | 去除整体姿态和尺度差异后的完整形状 | WT、TRELLIS.2、hybrid、Pixal3D |
 | `gso-camera-native-v1` | 不做 GT 配准 | 原生相机坐标下形状、姿态、位置和尺度的综合偏差 | WT、hybrid |
 | `gso-depth-ssi-v1` | 深度正尺度与偏移拟合 | 输入视角可见面的深度结构，另报覆盖率和轮廓 IoU | WT、hybrid |
+| `gso-multiview-mesh-sim3-v1` | 复用 shape-sim3 的单个 Sim(3) | 原生三角形的四视角深度、法向与轮廓一致性 | TRELLIS.2、hybrid、Pixal3D |
+| `gso-multiview-surfel-sim3-v1` | 同上 | 统一网格、PCA 法向和 surfel 渲染后的四视角几何一致性 | WT、TRELLIS.2、hybrid、Pixal3D |
 
-三组结果分别解释，不混成同一排名。`shape-sim3` 的配准矩阵不用于后两组指标。TRELLIS.2 缺少原输入相机位姿；Pixal3D 虽估计 FoV，但其规范化物体与原视图的尺度、位姿对应尚未建立，因此当前相机与深度指标为 **N/A**，不使用 GT 配准替它们补齐。
+各协议按其对齐约定解释。相机原生和 SSI 深度保持各自的对齐定义，两条多视角路线共用 shape-sim3 的配准矩阵。TRELLIS.2 缺少原输入相机位姿；Pixal3D 虽估计 FoV，但其规范化物体与原视图的尺度、位姿对应尚未建立，因此当前相机与深度指标为 **N/A**，不使用 GT 配准替它们补齐。
 
-主要实现：[评测入口](examples/evaluate_gso.py)、[几何与深度公式](evaluation/geometry.py)、[方法适用性](wt/experiment.py)。
+主要实现：[评测入口](../examples/evaluate_gso.py)、[几何与深度公式](../evaluation/geometry.py)、[方法适用性](../wt/experiment.py)。
 
 ## 2. 数据、单位与采样
 
@@ -134,7 +136,49 @@ $$
 
 GT 没有有效深度或评测抛出异常时，走整项评价失败分支，详情记录在 `evaluation_error.json`；不能保证仍有覆盖率或形状成绩。`depth_fit.json` 中的 `scale`、`shift`、`raw_mae` 为可用时保存的诊断字段，不属于当前工作簿主指标。
 
-## 6. 汇总与比较
+## 6. 多视角渲染几何一致性
+
+两条路径使用相同四视角和原生 GT 深度、面法向、前景遮罩，衡量配准后的几何一致性。固定配置位于 `configs/multiview.json`。独立协议记录了参考文献、实现细节、参数选择、P0 验收和 R2 完成结果。[独立协议与校准](20261107_multiview-geometric-consistency.md)
+
+### 6.1 几何与渲染
+
+- 原生 mesh 路径使用 `decoded_mesh.ply` 的全部三角形和面法向。WT 的该项状态为 N/A。
+- Surfel 路径对 mesh 进行 2,000,000 点面积采样，使用 `asset_seed("multiview_surface", asset_id)`。WT 汇集六层有效有限 XYZ 并去除完全重复点。
+- 应用已有 `registration.json` 后，以世界原点固定的 0.002D 网格保留最靠近网格中心的真实点。PCA 邻域半径 0.006D，最多 32 点、至少 6 点，第二特征值与最大特征值比值至少 0.01。
+- 每点渲染半径 0.003D 的有向正八边形 surfel。法向无效的点使用相同半径的相机朝向面片，其深度与遮罩仍参与评测，法向标记无效。
+- 两条路径共用输入方位加 0°、90°、180°、270°的视角，仰角 20°，512²，水平 FoV 40°，距离 `0.5/sin(20°)×1.2`，near/far 为 0.01/10。
+- RDF 相机坐标、像素中心、双面不透明最近 Z 光栅化。法向逐像素朝向相机。WT 渲染遮罩由变换后的 XYZ 几何投影生成，输入 alpha 用于最初的有效点筛选。
+
+每个预测的四视角共享一个正向 Sim(3)。深度直接使用 camera-Z，距离单位为 GT 对角线 D。
+
+### 6.2 指标
+
+设 P、G 为预测和 GT 的深度有效遮罩，N 为双方深度及法向均有效的交集。深度误差使用 P∩G，法向误差使用 N。
+
+| 字段 | 计算 | 方向 |
+| --- | --- | --- |
+| `depth_mae` | mean(abs(zp−zg))/D | ↓ |
+| `depth_rmse` | sqrt(mean((zp−zg)²))/D | ↓ |
+| `silhouette_iou` | count(P∩G)/count(P∪G) | ↑ |
+| `depth_coverage` | count(P∩G)/count(G) | ↑ |
+| `normal_mean_angle` | 单位法向夹角的均值，度 | ↓ |
+| `normal_psnr` | RGB=(n+1)/2，−10log10(max(MSE,1e−12))，上限 120 dB | ↑ |
+| `normal_lpips` | 全图法向 RGB，固定中性灰背景，预训练 AlexNet LPIPS v0.1 | ↓ |
+| `normal_coverage` | count(N)/count(G) | ↑ |
+
+另存 `normal_mse`、前景交集像素数、法向有效像素数和点邻域诊断。LPIPS 使用浮点法向图与 [−1,1] 输入范围。有效性按指标逐项记录。空预测的覆盖率和 IoU 为零，缺少交集的深度、角度和 PSNR 留空并记录原因。
+
+逐资产先对四视角等权平均，要求相应指标四视角均有效。然后按方法、配置 ID、seed 和实际推理参数哈希对资产等权平均，汇总均值、总体标准差、有效数、失败数、N/A 数以及共同有效资产的成绩。完整失败的运行进入计划总数。包含运行来源的原始配置哈希保存在 `source_config_hashes`，相同参数的恢复重试归入同组。
+
+### 6.3 采样影响与复现
+
+同时保存每份 mesh 的 surfel 对原生渲染误差、两条路径相对 GT 的配对分数差，以及 GT 的 surfel 对原生渲染误差。Surfel 的局部平滑、有限支撑半径和 WT 观测密度均会影响成绩，需结合这些诊断解释比较。
+
+P0 的 50 个运行在冻结配置下全部完成，10 个 GT 通过校准。R2 的 400 个运行全部完成，原生 mesh 路径 300 份、surfel 路径 400 份，两套协议均有 100 个共同有效资产，适用指标失败数为 0。最终 171 项 Python 测试通过，文件哈希审计与 30 组独立数值复算通过。
+
+本轮渲染数据 revision 为 `ed7c00868a202db3de37`，保存配置、环境与权重哈希及渲染源码归档。每份结果保存预测、GT、配准和运行元数据哈希及四视角浮点渲染图，支持校验后续跑。汇总源码独立归档，记录在 `summary.json` 的 `aggregation` 中。汇总按实际推理参数分组，渲染数据可用 `examples.summarize_multiview` 重新校验并统计。
+
+## 7. 汇总与比较
 
 先计算逐资产指标，再在相同实验、方法、配置、seed 下对有效样本取**等权算术均值**，不将所有资产的点或像素拼接计算。工作簿还按实际参数摘要区分配置，防止同名配置、不同参数被合并。
 
@@ -145,7 +189,7 @@ GT 没有有效深度或评测抛出异常时，走整项评价失败分支，�
 
 比较深度时优先查看**共同有效集合的误差、各方法覆盖率和失败率**，避免成功样本难度不同造成误读。推理完成、评测流程完成、单个指标有效是三种状态：`run.json.status=complete` 和 `metrics.json.evaluation_status=complete` 均不保证所有深度指标有效，应读取逐指标 `status`。
 
-## 7. 解释边界
+## 8. 解释边界
 
 | 研究问题 | 当前可以参考的证据 | 尚未覆盖或需要注意 |
 | --- | --- | --- |
@@ -154,9 +198,9 @@ GT 没有有效深度或评测抛出异常时，走整项评价失败分支，�
 | 输入视角几何忠实度 | SSI 深度误差、覆盖率、IoU | WT 仅取像素对应的 Z，不检查其预测 XY 是否重投影回该像素；不等于完整三维对齐 |
 | 缺失与额外几何 | 双向距离、F-score、投影覆盖率和 IoU | 深度交集外的错误不进入 MAE 等误差；需结合覆盖率、IoU 判断 |
 | 内部填充、空腔、拓扑 | 表面距离与逐阶段几何诊断 | 未计算占据体积、水密性或拓扑指标；内部多余面仅通过采样面积和距 GT 的距离影响成绩 |
-| 纹理、文字与材质 | 受控渲染及人工案例检查 | 当前没有 RGB、PSNR、SSIM、LPIPS、OCR 或 PBR 定量指标 |
+| 纹理、文字与材质 | 受控渲染及人工案例检查 | 外观 RGB、OCR 与 PBR 评价待扩展，法向 PSNR / LPIPS 按第 6 节计算 |
 
-WT 的 mask 来自输入 alpha，IoU 接近 1 不能证明额外的轮廓预测能力。δ1/δ2 的比例阈值较宽，且受 GT 相机距离影响，容易饱和；AbsRel 也以相机 Z 为分母，不是相对物体厚度的误差。材质、灯光和 viewer 中的展示平移不参与上述几何指标。
+第 5 节 SSI 深度的 WT mask 来自输入 alpha，需结合该来源解释 IoU。第 6 节多视角遮罩由几何重新投影产生。δ1/δ2 的比例阈值较宽，且受 GT 相机距离影响，容易饱和；AbsRel 也以相机 Z 为分母，不是相对物体厚度的误差。材质、灯光和 viewer 中的展示平移不参与上述几何指标。
 
 ## 附录 A：渲染、随机种子与保存文件
 
@@ -176,18 +220,30 @@ RNG = numpy.random.Generator(numpy.random.PCG64(seed))
 
 | 位置 | 关键复现文件 |
 | --- | --- |
-| `datasets/gso-v1/` | `inventory.jsonl`、`split.json`、各 split 清单 |
+| `$WT_PROCESSED_ROOT/gso/v1/` | `inventory.jsonl`、`split.json`、各 split 清单 |
 | 数据集 `samples/<asset>/` | `input.png`、`camera.json`、`render_config.json`、`gt_world.ply`、`gt_camera.ply`、`gt_points.npz`、`gt_depth.npz`、带产物哈希的 `input.json` |
 | 实验 `samples/<asset>/<method>/<config>/seed-*/` | `run.json`、`config.json`、`prediction.npz` 或 `decoded_mesh.ply`、mesh 坐标元数据 |
 | 同一结果目录中的评价产物 | `metrics.json`、`evaluation_points.npz`、`registration.json`；适用时有 `depth_fit.json`，异常时有 `evaluation_error.json` |
 
-数据集默认位于 `$WT_OUTPUT_ROOT/experiments/datasets/gso-v1/`，实验位于同级各实验目录。原始数据在 `$WT_DATA_ROOT/raw/gso/`，只读；渲染和评价入口先检查完整性标记 `COMPLETE.json`。
+数据集位于 `$WT_PROCESSED_ROOT/gso/v1/`，实验位于 `$WT_OUTPUT_ROOT/experiments/` 下各实验目录。原始数据在 `$WT_DATA_ROOT/raw/gso/`，只读；渲染和评价入口先检查完整性标记 `COMPLETE.json`。
 
 ## 附录 B：执行与维护
 
-按照 [README 环境说明](README.md#环境与安装)，在专用 screen 中激活 `world_tracing` 环境并加载 `scripts/env.sh`。以下是命令示例，不会因维护本文而自动重新评价：
+按照 [README 环境说明](../README.md#环境与安装) 在远程项目目录加载 `scripts/env.sh`，使用项目 `.venv`。长任务使用已确认的 tmux socket `wt-recovery` 与 `scripts/run_task.py` 记录状态。
 
 ```bash
+cd /mnt/cpfs1/shuqiliu/code/world_tracing
+source scripts/env.sh
+
+python -B -m scripts.setup_multiview
+
+python -B -m examples.evaluate_multiview \
+  "$WT_OUTPUT_ROOT/experiments/20261013-R2-gso-quant-v1"
+
+# 校验已有多视角结果并刷新汇总
+python -B -m examples.summarize_multiview \
+  "$WT_OUTPUT_ROOT/experiments/20261013-R2-gso-quant-v1"
+
 python examples/evaluate_gso.py \
   --experiment "$WT_OUTPUT_ROOT/experiments/20261013-R2-gso-quant-v1" \
   --workers 1
@@ -204,12 +260,14 @@ python examples/export_experiments.py \
 
 | 责任 | 代码 |
 | --- | --- |
-| 固定划分、用途 seed | [prepare_gso_inventory.py](examples/prepare_gso_inventory.py)：`split_ids`、`asset_seed` |
-| GT 归一化、相机、渲染 | [render.py](evaluation/render.py)：`normalize_parts`、`make_camera`、`Rasterizer.render`；[prepare_gso_views.py](examples/prepare_gso_views.py)：`prepare` |
-| 抽样、配准、指标 | [geometry.py](evaluation/geometry.py)：`surface_points`、`register_sim3`、`chamfer`、`depth_metrics` |
-| 方法坐标和状态分支 | [evaluate_gso.py](examples/evaluate_gso.py)：`evaluate_run`、`evaluate_one`；[canon.py](wt/textured_mesh/canon.py)；[experiment.py](wt/experiment.py)：`CAMERA_NA` |
-| 按资产汇总、共同集合 | [records.py](evaluation/records.py)：`summarize`；[research_workbook.py](evaluation/research_workbook.py)：`_stats`、`_paired` |
+| 固定划分、用途 seed | [prepare_gso_inventory.py](../examples/prepare_gso_inventory.py)：`split_ids`、`asset_seed` |
+| GT 归一化、相机、渲染 | [render.py](../evaluation/render.py)：`normalize_parts`、`make_camera`、`Rasterizer.render`；[prepare_gso_views.py](../examples/prepare_gso_views.py)：`prepare` |
+| 抽样、配准、指标 | [geometry.py](../evaluation/geometry.py)：`surface_points`、`register_sim3`、`chamfer`、`depth_metrics` |
+| 方法坐标和状态分支 | [evaluate_gso.py](../examples/evaluate_gso.py)：`evaluate_run`、`evaluate_one`；[canon.py](../wt/textured_mesh/canon.py)；[experiment.py](../wt/experiment.py)：`CAMERA_NA` |
+| 多视角渲染与指标 | [multiview.py](../evaluation/multiview.py)、[evaluate_multiview.py](../examples/evaluate_multiview.py) |
+| 多视角已存结果汇总 | [summarize_multiview.py](../examples/summarize_multiview.py) |
+| 按资产汇总、共同集合 | [records.py](../evaluation/records.py)：`summarize`；[research_workbook.py](../evaluation/research_workbook.py)：`_stats`、`_paired` |
 
 改变指标公式、单位、采样、配准、渲染或有效性规则时，应更新本文、相关协议 ID / 数据集版本，并先用 P0 检查，再生成新版本结果；旧成绩保留其原协议和来源。仅补充说明且数值行为不变时，不更改协议 ID。
 
-评测器当前将入口、`geometry.py`、`render.py`、`canon.py` 的源码摘要合成为 `evaluator_sha256`；已有评价摘要不一致时默认拒绝跳过。`--force` 会重算并覆盖评价产物，不自动归档旧结果，也不自动升级协议 ID，使用前需明确版本与保留方式。渲染配置变化则要求新建数据集版本。哈希保护不替代完整的源码、环境及输入来源记录。
+CD / 相机 / SSI 评测器当前将入口、`geometry.py`、`render.py`、`canon.py` 的源码摘要合成为 `evaluator_sha256`；已有评价摘要不一致时默认拒绝跳过。`--force` 会重算并覆盖评价产物，不自动归档旧结果，也不自动升级协议 ID，使用前需明确版本与保留方式。渲染配置变化则要求新建数据集版本。哈希保护不替代完整的源码、环境及输入来源记录。

@@ -50,6 +50,7 @@ dependencies = [
 
 [project.optional-dependencies]
 experiments = [
+    "rtree==1.4.1",
     "openpyxl>=3.1.5,<3.2",
 ]
 viz = [

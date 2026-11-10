@@ -8,7 +8,11 @@ World Tracing（WT）从单张图像或视频预测像素对齐的多层三维�
 
 按推理顺序的 class/function 调用链、张量形状及坐标/尺度约定见本地文档 `docs/20261013_CODE-STRUCTURE.md`。
 
-定量评测的指标公式、配准与采样、失败判定及复现约定见 [评估协议](docs/evaluation_protocol.md)。
+定量评测的指标公式、配准与采样、失败判定及复现约定见 [评估协议](docs/archived/evaluation_protocol_v0.md)。
+
+新一轮评测采用 [v0.5 协议](docs/evaluation_protocol_v0.5.md)，以配准后的完整与输入可见几何为主，四方法各 8 个 seed，decoded/GLB 分组独立按完整 CD-L1 选 seed。P0 已完成 10 资产、seed 42 的 70 项校准验收。默认保存 input-view PNG，--save-multiview-renders 开启 30 视角 PNG，全部视角指标与 NPZ 均保存。
+
+多视角几何采用原生 mesh 与统一 surfel 两条路径。加载 `scripts/env.sh` 后运行 `python -B -m scripts.setup_multiview`，再运行 `python -B -m examples.evaluate_multiview "$WT_OUTPUT_ROOT/experiments/20261013-R2-gso-quant-v1"`。逐运行结果由 `multiview.json` 索引，分组统计与 mesh 配对差异保存在 `$WT_OUTPUT_ROOT/evaluation/multiview/<revision>/<experiment>/summary.json`。已有结果的校验与汇总可运行 `python -B -m examples.summarize_multiview "$WT_OUTPUT_ROOT/experiments/20261013-R2-gso-quant-v1"`。[参数选择、P0 验收与 R2 结果](docs/archived/20261107_multiview-geometric-consistency.md)
 
 ## Package layout
 
@@ -53,9 +57,9 @@ viewer_utils/               查看器文件格式与数据布局适配
 
 ## 环境与安装
 
-当前服务器使用项目内独立环境 `.venv`（Python 3.11、PyTorch 2.6.0 / CUDA 12.4），GPU 为 A100 80GB（SM80）。安装与执行入口见 RUNBOOK，当前状态见 PROGRESS。旧服务器及恢复过程记录在 [项目历史](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261107_project-history.md)。
+当前服务器使用项目内独立环境 `.venv`（Python 3.11、PyTorch 2.6.0 / CUDA 12.4），GPU 为 A100 80GB（SM80）。安装与执行入口见 RUNBOOK，当前状态见 PROGRESS。旧服务器及恢复过程记录在 [项目历史](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/archived/20261105_recovery-results.md)。
 
-2026-11-07 已完成 621 项实验恢复及工作簿发布，包括 P0、R1、R2 和既有两组对照。新旧数值差异、质量失败、单卡执行策略和验收限制均有记录。[恢复结果报告](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_recovery-results.md)
+2026-11-07 已完成 621 项实验恢复及工作簿发布，包括 P0、R1、R2 和既有两组对照。新旧数值差异、质量失败、单卡执行策略和验收限制均有记录。[恢复结果报告](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/archived/20261105_recovery-results.md)
 
 通过 `ssh ali-dsw` 登录后，在项目目录启动专用 tmux 会话：
 
@@ -138,7 +142,7 @@ python viewer.py --experiment "$WT_OUTPUT_ROOT/experiments/20261013-R1-object-qu
 
 每个结果存为 `samples/<sample_id>/<method>/<config_id>/seed-0042/`，用 `run.json` 标记完成或失败；WT 原始点图为 `prediction.npz`，mesh 为 `mesh.glb`，导出前后坐标说明存于 `mesh.json`。重复执行同一命令会跳过已完成结果；参数、输入或源码变更使用新配置/实验 ID。`--methods wt trellis2 wt_trellis2` 可选方法，`--configs` 接收 JSON 配置列表，`--inputs` 接收带 `sample_id/image` 的 JSONL 清单。批处理是模型复用的单图队列，显存 batch=1；TRELLIS 的 low-VRAM 模式仍可在 CPU/GPU 间移动已加载权重。
 
-根目录 `experiments.xlsx` 是研究记录：`实验总览` 按实验合并单元格，按方法、配置和 seed 列出结果；各定量实验另有相同表头的逐样本 sheet。定性结论、配置观察可直接编辑，刷新时保留；指标从 `metrics.json` 重算，只记录本项目结果。执行 `python examples/export_experiments.py --experiments "$WT_OUTPUT_ROOT/experiments" --out experiments.xlsx --audit "$WT_OUTPUT_ROOT/validation/experiments-workbook.json"` 刷新。列上方的 `+` 展开补充指标；配置与结果列提供来源链接。合并区按实验/样本成组，不按单行跨组排序。完整参数、源码和重试记录仍保存在实验目录，不另铺技术明细 sheet。
+根目录 `experiments.xlsx` 为 v0.5 空白记录表，沿用实验总览、P0/R2 逐样本三张表及原样式，按输出阶段、统计口径和 seed 记录完整几何、输入可见几何与渲染结果。初版完整工作簿存于 [docs/archived/20261110_experiment_baseline_protocol_v0.xlsx](docs/archived/20261110_experiment_baseline_protocol_v0.xlsx)。历史协议中的工作簿路径对应此存档。旧版导出入口 `python examples/export_experiments.py --experiments "$WT_OUTPUT_ROOT/experiments"` 默认写入项目 `.runtime/experiments-protocolv0-regenerated.xlsx`。v0.5 自动填表待后续接入，逐视角图与完整统计通过结果来源列引用。
 
 批量查看器启动时只读取 JSON 索引；在 `Sample` 选择样本后，才加载该样本的图像、全部匹配结果和 GT（默认开启）。切换样本清除旧显示，过期加载在可中断阶段退出；不会预加载其他样本，也不限制比较结果数量。展开 `Method / Config / Seed` 可勾选多个选项，各组提供“全选／清空”；Method、Config 默认全选，Seed 默认选中第一个种子。组内匹配任一选项，组间同时满足；任一组清空则不加载方法结果，GT 仍由独立开关控制。刷新保留有效选择，全选时包含新增选项。支持前一张/后一张、刷新结果；当前样本最多同时准备两份结果，已准备结果使用最多 256 MiB 的内存缓存，源文件变更后重新加载。
 

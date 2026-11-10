@@ -63,13 +63,15 @@ class Rasterizer:
             raise ValueError('max_faces_per_pass must be positive')
         self.max_faces_per_pass = max_faces_per_pass
 
-    def render(self, parts, K, world_to_camera, resolution, near=.01, far=10., texture=True):
+    def render(self, parts, K, world_to_camera, resolution, near=.01, far=10., texture=True, normal_mode="vertex"):
         """Row 0 is the top of the saved image. Depth is camera Z, never NDC/ray length.
 
         Rasterize both face orientations. No scene light: stored texture RGB under
         constant unit ambient illumination, no tone mapping or color-space conversion.
         Alpha/mask and depth use center samples; no depth interpolation across edges.
         """
+        if normal_mode not in ("vertex", "face"):
+            raise ValueError("normal_mode must be vertex or face")
         torch, dr = self.torch, self.dr
         K = np.asarray(K, dtype=np.float64)
         T = np.asarray(world_to_camera, dtype=np.float64)
@@ -83,7 +85,9 @@ class Rasterizer:
                              2*K[1, 1]/resolution*xyz[:, 1]+(2*K[1, 2]/resolution-1)*z,
                              (far+near)/(far-near)*z-2*far*near/(far-near), z], axis=-1)
             vertices = torch.as_tensor(clip, dtype=torch.float32, device=self.device)[None].contiguous()
-            attr = np.concatenate([xyz[:, 2:3], np.asarray(mesh.vertex_normals)@T[:3, :3].T], axis=1)
+            attr = xyz[:, 2:3]
+            if normal_mode == "vertex":
+                attr = np.concatenate([attr, np.asarray(mesh.vertex_normals)@T[:3, :3].T], axis=1)
             attributes = torch.as_tensor(attr, dtype=torch.float32, device=self.device)[None].contiguous()
             uv = pixels_gpu = colors_gpu = None
             if texture and hasattr(mesh.visual, 'uv') and mesh.visual.uv is not None:
@@ -121,9 +125,14 @@ class Rasterizer:
                 depth[mask] = values[..., 0][mask]
                 rgba[mask, :3] = np.clip(color[mask]*255, 0, 255).astype(np.uint8)
                 rgba[mask, 3] = 255
-                n = values[..., 1:4]
+                if normal_mode == "face":
+                    triangle_ids = rast[0, ..., 3].cpu().numpy()[mask].astype(np.int64) - 1 + start
+                    triangles = xyz[np.asarray(mesh.faces)[triangle_ids]]
+                    n = np.cross(triangles[:, 1] - triangles[:, 0], triangles[:, 2] - triangles[:, 0])
+                else:
+                    n = values[..., 1:4][mask]
                 n /= np.maximum(np.linalg.norm(n, axis=-1, keepdims=True), 1e-12)
-                normals[mask] = n[mask]
+                normals[mask] = n
         mask = np.isfinite(depth)
         depth[~mask] = 0
         return rgba, depth, mask, normals

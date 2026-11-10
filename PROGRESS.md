@@ -1,6 +1,12 @@
 # world_tracing 项目进度
 
-更新于 2026-11-07（Asia/Shanghai）。
+更新于 2026-11-10（Asia/Shanghai）。
+
+## 当前评测
+
+初版单 seed 结果与四视角扩展已完成，见 [初版评测协议结果](docs/archived/20261107_multiview-geometric-consistency.md)。[v0.5](docs/evaluation_protocol_v0.5.md) 采用配准后的完整与输入可见几何、双阶段独立 best-of-8 及 30 视角。P0 已完成 70/70 阶段及校准验收。R2 按 100 资产、seed 42–49 执行，工作记录位于 .runtime/logs/baseline-v05-r2-20261110，结果分析写入 docs/20261110_hybrid-baseline_gso-quant_eval-v0.5.md。
+
+旧工作簿存档为 `docs/archived/20261110_experiment_baseline_protocol_v0.xlsx`，根目录 `experiments.xlsx` 为 v0.5 空白表。报告、脚本及中间输出整理清单位于输出 `archives/20261110-baseline-consolidation/manifest.json`。
 
 ## 实验恢复完成
 
@@ -13,11 +19,11 @@
 | 纹理种子对照 | 6 |
 | 合计 | 621 |
 
-GSO 1030 个原始资产及其派生数据已恢复，110 份冻结视图与 GT 已重建，历史 P0/R2 样本身份核对通过。工作簿已发布并保留人工结论、实验目的和备注。[恢复结果](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_recovery-results.md)
+GSO 1030 个原始资产及其派生数据已恢复，110 份冻结视图与 GT 已重建，历史 P0/R2 样本身份核对通过。工作簿已发布并保留人工结论、实验目的和备注。[恢复结果](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/archived/20261105_recovery-results.md)
 
 环境为 A100 80GB、Python 3.11.11、PyTorch 2.6.0+cu124、NumPy 1.26.4。基础环境与 Pixal3D 独立环境均已通过依赖及 CUDA 验证。WT、TRELLIS.2、Pixal3D 及所需辅助权重就绪。
 
-正式执行采用 WT batch=1，网格和 Pixal 使用同卡双进程。R2 四方法形状评价均为 100/100 有效，SSI 深度有效数为 WT 99/100、hybrid 80/100。质量失败原因和跨服务器数值差异已记录。[单卡复核](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261105_single-gpu-batch-review.md)
+正式执行采用 WT batch=1，网格和 Pixal 使用同卡双进程。R2 四方法形状评价均为 100/100 有效，SSI 深度有效数为 WT 99/100、hybrid 80/100。质量失败原因和跨服务器数值差异已记录。[单卡复核](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/archived/20261105_recovery-results.md)
 
 ## 项目整理
 
@@ -41,4 +47,4 @@ viewer 修复 `57565ee` 已通过 cherry-pick 合入 main，生成提交 `089b8a
 - 参数扫描、best-of-N、1536 模式及论文协议的数值复现尚待独立实验。
 - 工作簿结构、数值与链接已核验，原生 Excel 界面的显示验证仍待完成。
 
-当前命令与路径见 [运行手册](/mnt/cpfs1/shuqiliu/code/world_tracing/RUNBOOK.md)。早期阶段状态及排障过程见 [历史记录](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/20261107_project-history.md)。
+当前命令与路径见 [运行手册](/mnt/cpfs1/shuqiliu/code/world_tracing/RUNBOOK.md)。早期阶段状态及排障过程见 [历史记录](/mnt/cpfs1/shuqiliu/code/world_tracing/docs/archived/20261105_recovery-results.md)。

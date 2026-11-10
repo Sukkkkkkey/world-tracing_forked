@@ -68,7 +68,7 @@ def cube_rotations():
                 yield matrix
 
 
-def register_sim3(pred, gt, iterations=100, tolerance=1e-6):
+def register_sim3(pred, gt, iterations=100, tolerance=1e-6, *, initial_rotations=None):
     """24 proper starts; symmetric nearest-neighbor ICP, select symmetric squared loss."""
     pred, gt = valid_points(pred), valid_points(gt)
     pred_scale = np.sqrt(np.mean(np.sum((pred-pred.mean(0))**2, axis=1)))
@@ -77,7 +77,8 @@ def register_sim3(pred, gt, iterations=100, tolerance=1e-6):
         raise ValueError('Degenerate registration cloud')
     gt_tree = cKDTree(gt)
     best_loss, best_matrix, starts = np.inf, None, []
-    for index, rotation in enumerate(cube_rotations()):
+    rotations = cube_rotations() if initial_rotations is None else initial_rotations
+    for index, rotation in enumerate(rotations):
         matrix = np.eye(4)
         matrix[:3, :3] = rotation * (gt_scale/pred_scale)
         matrix[:3, 3] = gt.mean(0)-matrix[:3, :3]@pred.mean(0)

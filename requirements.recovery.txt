@@ -63,6 +63,7 @@ regex==2026.9.29
 requests==2.34.2
 rerun-sdk==0.22.1
 rich==14.3.4
+rtree==1.4.1
 safetensors==0.8.0
 scipy==1.17.1
 six==1.17.0

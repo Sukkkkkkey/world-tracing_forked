@@ -55,6 +55,14 @@ source scripts/env.sh
 
 活动日志位于 CPFS，完成记录复制到输出目录。SSH 断线后先核对已有 PID 和状态文件。运行前检查 GPU、实例内存及目标目录。
 
+## 调整评测协议与复用推理输出
+
+仅调整指标、配准或渲染协议时，复用输入、checkpoint、推理与导出参数、seed 对应的有效产物。通过 `examples.evaluate_baseline_v2` 的 `--source-experiment` 指向已有输出，使用 `--seeds` 限定本轮范围，评测结果按独立 revision 保存。
+
+新增方法、seed、生成配置、产物补齐以及明确的重复推理复现性实验，按相应范围执行推理。复用前核对来源与摘要，已有完整候选由缓存检查跳过。`scripts.run_baseline_v2` 用于补充 seed 的推理与评测队列。
+
+当前 R2 v0.5 使用 `20261013-R2-gso-quant-v1` 的全部 400 份 seed 42 输出，完成 700 项评测。seed 43–49 队列已暂停。后续仅变更评测时继续沿用这些输出。[结果分析](docs/20261110_hybrid-baseline_gso-quant_eval-v0.5.md)
+
 ## 实验结果与历史验收
 
 621 项恢复于 2026-11-07 完成，存档工作簿 SHA-256 为 `83d72e6b3505864b9c18e2b7c1c0db6261449782618820bfe181dffe7f6f6fcf`。恢复完成源码版本为 `f00327fc86540047c38cb8553de3d480f6cc32d4`。

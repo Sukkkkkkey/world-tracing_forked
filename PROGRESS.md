@@ -1,10 +1,10 @@
 # world_tracing 项目进度
 
-更新于 2026-11-10（Asia/Shanghai）。
+更新于 2026-11-11（Asia/Shanghai）。
 
 ## 当前评测
 
-初版单 seed 结果与四视角扩展已完成，见 [初版评测协议结果](docs/archived/20261107_multiview-geometric-consistency.md)。[v0.5](docs/evaluation_protocol_v0.5.md) 采用配准后的完整与输入可见几何、双阶段独立 best-of-8 及 30 视角。P0 已完成 70/70 阶段及校准验收。R2 按 100 资产、seed 42–49 执行，工作记录位于 .runtime/logs/baseline-v05-r2-20261110，结果分析写入 docs/20261110_hybrid-baseline_gso-quant_eval-v0.5.md。
+初版单 seed 结果与四视角扩展已完成，见 [初版评测协议结果](docs/archived/20261107_multiview-geometric-consistency.md)。[v0.5](docs/evaluation_protocol_v0.5.md) 采用配准后的完整与输入可见几何、双阶段独立 best-of-8 及 30 视角。P0 已完成 70/70 阶段及校准验收。R2 已完成 100 资产、seed 42 的 700/700 项评测，复用上一轮 400 份推理输出，新增推理 0 次。seed 43–49 已按用户要求暂停。完整测试 224 项通过，工作记录位于 .runtime/logs/baseline-v05-r2-20261110。[R2 结果分析](docs/20261110_hybrid-baseline_gso-quant_eval-v0.5.md)
 
 旧工作簿存档为 `docs/archived/20261110_experiment_baseline_protocol_v0.xlsx`，根目录 `experiments.xlsx` 为 v0.5 空白表。报告、脚本及中间输出整理清单位于输出 `archives/20261110-baseline-consolidation/manifest.json`。
 

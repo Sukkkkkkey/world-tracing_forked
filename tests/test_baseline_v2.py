@@ -196,3 +196,37 @@ def test_candidate_failure_rate_keeps_pending_budget_explicit():
     assert row["pending_candidates"] == 7
     assert row["failure_rate_among_evaluated"] == 1
     assert row["budget_failure_rate"] is None
+
+
+@pytest.mark.parametrize("mode", ["formal", "calibration", "fixed_seed"])
+def test_markdown_reports_raw_rmse_and_all_ssi_depth_metrics(mode):
+    from examples.summarize_baseline_v2 import markdown
+
+    values = {
+        "surfel.input.depth_rmse": {"mean": .061, "n": 100},
+        "surfel.multiview.depth_rmse": {"mean": .072, "n": 100},
+        **{f"surfel.input_ssi.{metric}": {"mean": value, "n": 63}
+           for metric, value in (("mae", .026), ("rmse", .041), ("absrel", .016),
+                                 ("delta1", .9975), ("delta2", 1.))},
+    }
+    report = {
+        "mode": mode, "config": {"report_single_seed": 42},
+        "status_counts": {"complete": 100, "failed": 0}, "pending_stages": 0,
+        "groups": [{"method": "wt", "stage": "points", "mode": "single_seed",
+                    "metrics": values}],
+    }
+    output = markdown(report)
+    assert "0.061000 (n=100)" in output
+    assert "0.072000 (n=100)" in output
+    ssi = output.split("### 输入深度 SSI", 1)[1].split("## 产物", 1)[0]
+    assert "| MAE | RMSE | AbsRel | δ<1.25 | δ<1.25² |" in ssi
+    assert "| 0.026000 (n=63) | 0.041000 (n=63) | 0.016000 (n=63)" in ssi
+    assert "0.997500 (n=63) | 1.000000 (n=63)" in ssi
+    assert "覆盖率门槛为 95%" in ssi
+    if mode == "fixed_seed":
+        assert "本轮使用固定 seed 42" in output
+        assert "Best-of-8" not in output
+
+    report["groups"][0]["metrics"] = {}
+    missing = markdown(report).split("### 输入深度 SSI", 1)[1].split("## 产物", 1)[0]
+    assert "| wt | points | N/A | N/A | N/A | N/A | N/A |" in missing

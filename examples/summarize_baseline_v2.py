@@ -269,6 +269,10 @@ def markdown(report):
     if report.get("mode") == "calibration":
         lines += ["P0 校准使用固定 seed 42。", ""]
         modes = {"single_seed": "固定 seed 42"}
+    elif report.get("mode") == "fixed_seed":
+        seed = report["config"]["report_single_seed"]
+        lines += [f"本轮使用固定 seed {seed}。", ""]
+        modes = {"single_seed": f"固定 seed {seed}"}
     else:
         lines += ["Best-of-8 按资产、方法和输出阶段的完整几何 CD-L1 选择，"
                   "该组全部指标使用同一 seed。八次均值先在资产内平均有效候选。", ""]
@@ -298,9 +302,16 @@ def markdown(report):
         for group, title in (("input", "输入视角"), ("multiview", "30 视角")):
             lines += [f"### {title} · 共同 surfel 表示", ""]
             lines += table(groups, [(label, f"surfel.{group}.{metric}") for label, metric in
-                                   (("深度 MAE", "depth_mae"), ("IoU", "silhouette_iou"),
+                                   (("深度 MAE", "depth_mae"), ("深度 RMSE", "depth_rmse"),
+                                    ("IoU", "silhouette_iou"),
                                     ("法线角误差", "normal_mean_angle"), ("法线 LPIPS", "normal_lpips"),
                                     ("深度覆盖", "depth_coverage"), ("法线覆盖", "normal_coverage"))])
+        lines += ["### 输入深度 SSI · 共同 surfel 表示", "",
+                  "在完整几何 Sim(3) 重渲染后，逐资产拟合深度的正尺度与标量偏移。"
+                  "覆盖率门槛为 95%，各项 n 为通过该门槛及拟合有效性检查的资产数。", ""]
+        lines += table(groups, [(label, f"surfel.input_ssi.{metric}") for label, metric in
+                               (("MAE", "mae"), ("RMSE", "rmse"), ("AbsRel", "absrel"),
+                                ("δ<1.25", "delta1"), ("δ<1.25²", "delta2"))])
         exported = [row for row in groups if row["stage"] == "glb"]
         if exported:
             lines += ["### 同 seed、同 decoded 变换的导出差值", "",

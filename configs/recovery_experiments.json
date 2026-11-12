@@ -1,0 +1,114 @@
+{
+  "seed": 42,
+  "device": 0,
+  "evaluation_workers": 2,
+  "experiments": [
+    {
+      "id": "20261013-P0-gso-pilot-v1",
+      "split": "pilot",
+      "samples": 10,
+      "runs": 50,
+      "configs": "configs/recovery_with_shared_wt.json",
+      "pixal3d": true
+    },
+    {
+      "id": "20261013-R1-object-qual-v1",
+      "input_dir": "examples/test_images/object",
+      "samples": 30,
+      "runs": 150,
+      "configs": "configs/recovery_with_shared_wt.json",
+      "pixal3d": true
+    },
+    {
+      "id": "20261013-R2-gso-quant-v1",
+      "split": "eval100",
+      "samples": 100,
+      "runs": 400,
+      "configs": "configs/recovery_defaults.json",
+      "pixal3d": true
+    }
+  ],
+  "qualitative_ids": [
+    "multi001_chess_set_marble",
+    "multi006_jewellery_flatlay_layout",
+    "obj008_lowpoly_tree",
+    "obj014_leather_briefcase",
+    "obj015_wooden_train",
+    "obj025_cartoon_dino",
+    "obj035_cartoon_icecream",
+    "obj040_leather_armchair",
+    "obj044_anime_sneaker",
+    "obj062_bengal_tiger",
+    "obj063_trex_dinosaur",
+    "obj067_triceratops",
+    "obj069_pixar_dwarf",
+    "obj070_red_fox",
+    "obj071_griffin",
+    "obj072_power_armor",
+    "obj083_chibi_swordsman",
+    "obj085_pterodactyl",
+    "obj087_industrial_mech",
+    "obj101_crimson_battle_mech",
+    "obj107_cyberpunk_exoskeleton",
+    "obj110_aqua_diving_mech",
+    "obj120_sea_serpent_leviathan",
+    "obj122_bronze_athletic_discobolus",
+    "obj123_jade_dragon_curio",
+    "obj125_bronze_lion_guardian",
+    "obj138_retro_camper_van",
+    "obj141_brass_telescope_orrery",
+    "obj147_crystal_palace_glass",
+    "obj149_hand_painted_kokeshi_set"
+  ],
+  "supplemental": [
+    {
+      "id": "z-root-cause-20261020",
+      "runs": 15,
+      "variants": [
+        "baseline",
+        "black",
+        "crop50",
+        "crop80",
+        "whole"
+      ],
+      "seed": 42,
+      "samples": [
+        "DPC_tropical_Trends_Hat",
+        "Frozen_Olafs_In_Trouble_PopOMatic_Game",
+        "SCHOOL_BUS"
+      ],
+      "image_size": 504,
+      "wt_steps": 20,
+      "alpha_erode": 0,
+      "default_background": [
+        128,
+        128,
+        128
+      ],
+      "crop_ratios": {
+        "baseline": 0.6666666666666666,
+        "black": 0.6666666666666666,
+        "crop50": 0.5,
+        "crop80": 0.8,
+        "whole": null
+      }
+    },
+    {
+      "id": "20261020-icecream-texture-seeds-v1",
+      "runs": 6,
+      "sample": "obj035_cartoon_icecream",
+      "wt_seed": 42,
+      "shape_seed": 42,
+      "texture_seeds": [
+        7,
+        42,
+        123
+      ],
+      "configs": [
+        "defaults-v1",
+        "shared-wt-v1"
+      ]
+    }
+  ],
+  "excluded": "Never-run parameter sweeps and best-of-8 are outside restoration scope"
+}

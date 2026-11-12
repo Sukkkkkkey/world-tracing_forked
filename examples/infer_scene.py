@@ -37,6 +37,8 @@ from pathlib import Path
 import numpy as np
 import torch
 
+from wt.paths import output_path
+
 from wt import inference_diffusion, solve_intrinsics_from_xyz
 from wt.checkpoint import build_model_and_load_ckpt
 from wt.cli import parse_bg_color, resolve_seeds
@@ -72,7 +74,7 @@ def main():
         help="Model config (default: r69l -- the 840x840 scene model)",
     )
     p.add_argument(
-        "--out", type=Path, default=Path("infer_scene.rrd"), help="Output .rrd"
+        "--out", type=Path, default=output_path("infer_scene.rrd"), help="Output .rrd"
     )
     p.add_argument(
         "--seed",

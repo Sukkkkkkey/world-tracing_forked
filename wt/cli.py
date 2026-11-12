@@ -9,6 +9,8 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
+from wt.paths import output_path
+
 
 DEFAULT_SWEEP_BASE_SEED = 42
 DEFAULT_SWEEP_SIZE = 4
@@ -92,7 +94,7 @@ def add_common_args(p: argparse.ArgumentParser, default_out: str) -> None:
     p.add_argument(
         "--out",
         type=Path,
-        default=Path(default_out),
+        default=output_path(default_out),
         help="Output .rrd file",
     )
     p.add_argument(

@@ -49,8 +49,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+experiments = [
+    "rtree==1.4.1",
+    "openpyxl>=3.1.5,<3.2",
+]
 viz = [
     "rerun-sdk>=0.22,<0.23",
+    "viser==1.1.1",  # Reviewed frontend lifecycle patch in setup_viser_client.py.
     "scipy>=1.11",
 ]
 # Foreground matting for object inputs (ZhengPeng7/BiRefNet_HR, MIT).
@@ -85,7 +90,7 @@ Repository = "https://github.com/haoz19/world-tracing"
 Issues = "https://github.com/haoz19/world-tracing/issues"
 
 [tool.setuptools.packages.find]
-include = ["wt*"]
+include = ["wt*", "evaluation*"]
 exclude = ["examples*", "tests*"]
 
 [tool.setuptools.package-data]

@@ -1,0 +1,49 @@
+{
+  "version": "omniobject3d-v2-systematic100-seed42",
+  "dataset": "omniobject3d-ood-v2",
+  "split": "eval100",
+  "seeds": [
+    42
+  ],
+  "methods": {
+    "wt": "defaults-v1",
+    "trellis2": "defaults-v1"
+  },
+  "mesh_stages": [
+    "decoded",
+    "glb"
+  ],
+  "registration": "principal-frames-24-proper-rotations",
+  "registration_points": 10000,
+  "evaluation_points": 100000,
+  "selector": "shape.cd_euclidean_mean",
+  "selection_scope": "asset-method-stage",
+  "report_single_seed": 42,
+  "report_mean_of_seeds": true,
+  "input_view": {
+    "resolution": 504,
+    "intrinsics": "K_crop",
+    "extrinsics": "T_world_to_camera",
+    "geometry_metrics": true,
+    "ssi_rendered_depth": true,
+    "rgb_glb": true
+  },
+  "multiview_config": "configs/multiview_baseline_v2.json",
+  "export_policy": "reuse-frozen-inference-export-parameters",
+  "output_root": "evaluation/ood-v05",
+  "registration_workers": 8,
+  "protocol_version": "0.5",
+  "visibility": {
+    "backend": "trimesh-float64-projected-rtree",
+    "tolerance": 0.0001,
+    "batch_size": 256,
+    "rtree_version": "1.4.1",
+    "surface_tolerance": 1e-06,
+    "parallel_epsilon": 1e-12
+  },
+  "render_artifacts": {
+    "format": "png",
+    "depth_error_max": 0.05,
+    "save_multiview": false
+  }
+}

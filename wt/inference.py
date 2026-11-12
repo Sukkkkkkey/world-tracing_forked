@@ -155,8 +155,10 @@ def _depth_to_xyz(
     fy = intrinsics[:, 1, 1][:, None, None, None]
     cx = intrinsics[:, 0, 2][:, None, None, None]
     cy = intrinsics[:, 1, 2][:, None, None, None]
-    u = torch.arange(width, device=device, dtype=depth.dtype)
-    v = torch.arange(height, device=device, dtype=depth.dtype)
+    # Match solve_intrinsics_from_xyz: image boundaries are integers,
+    # while pixel centres are (column + 0.5, row + 0.5).
+    u = torch.arange(width, device=device, dtype=depth.dtype) + 0.5
+    v = torch.arange(height, device=device, dtype=depth.dtype) + 0.5
     v, u = torch.meshgrid(v, u, indexing="ij")
     u = u[None, None].expand(batch_size, num_layers, -1, -1)
     v = v[None, None].expand(batch_size, num_layers, -1, -1)
@@ -388,8 +390,9 @@ def inference_diffusion_multiview(
 ) -> tuple[torch.Tensor | None, torch.Tensor, torch.Tensor | None]:
     """Multi-view counterpart of :func:`inference_diffusion`.
 
-    The release scene model ``r69l_v2_evermotion_ithappy_840_opp`` is multi-view
-    and uses this function.  ``rgb_mv`` has shape ``[B, V, 3, H, W]``; ``V``
+    This API is for compatible multi-view checkpoints; the released r69l
+    scene CLI uses single-image ``inference_diffusion``. ``rgb_mv`` has
+    shape ``[B, V, 3, H, W]``; ``V``
     views are folded into the leading batch dim so the model sees an
     effective batch ``B*V``, with ``conditioning["num_view"] = V`` threading
     view-block attention through the decoder.

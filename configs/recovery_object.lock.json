@@ -1,0 +1,19 @@
+{
+  "repo": "haoz19/object-model-6layer",
+  "revision": "e9da924a0e00bb46569cc5e351bddb9d020b927f",
+  "files": [
+    {
+      "name": "README.md",
+      "bytes": 4624,
+      "sha256": null,
+      "blob_id": "3f14397cb79b6ab523da7badf48351162b428801"
+    },
+    {
+      "name": "model.pt",
+      "bytes": 6211886598,
+      "sha256": "d61cab86969a8f0763225bd07314b79894605439df11b0030fc21d22e3a1c10f",
+      "blob_id": "404472b84f2fa8f15470b0be6a609edd2a2937cf"
+    }
+  ],
+  "bytes": 6211891222
+}

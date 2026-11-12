@@ -101,7 +101,8 @@ def download_from_hf(repo_id: str, filename: str = HF_DEFAULT_FILENAME,
         Relative file path inside the repo.  Defaults to ``model.pt``.
     cache_dir
         Local cache directory.  ``None`` falls back to the
-        ``HF_HOME`` / ``~/.cache/huggingface`` default.
+        ``HF_HOME`` default configured by :mod:`wt.paths` under the
+        project's weights directory (unless explicitly overridden).
 
     Returns the local path to the (possibly cached) file.
     """

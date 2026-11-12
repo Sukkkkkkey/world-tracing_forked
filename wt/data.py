@@ -363,7 +363,9 @@ def preprocess_rgba_for_model(
             for r76).
         num_layers: model ``num_layers`` (e.g. 6).
         intrinsics_override: optional ``[3, 3]`` K at the *original*
-            resolution.  Defaults to :func:`make_default_intrinsics`.
+            resolution, with pixel centres at (column+0.5, row+0.5).
+            The crop offset is subtracted before resizing. Without an
+            override, :func:`make_default_intrinsics` uses the cropped canvas.
         alpha_erode_px: if > 0, erode the foreground mask by this many
             pixels.  Helps suppress deep-layer "plume" artifacts caused by
             over-segmented matting / SAM masks.
@@ -395,6 +397,7 @@ def preprocess_rgba_for_model(
     else:
         rgba_crop = rgba_uint8
         side = max(rgba_crop.shape[:2])
+        y1, x1 = 0, 0
 
     rgb = rgba_crop[:, :, :3]
     alpha = rgba_crop[:, :, 3]
@@ -432,15 +435,16 @@ def preprocess_rgba_for_model(
 
     orig_h, orig_w = rgba_crop.shape[:2]
     intr = (
-        intrinsics_override.copy()
+        np.asarray(intrinsics_override, dtype=np.float32).copy()
         if intrinsics_override is not None
         else make_default_intrinsics(orig_h, orig_w)
     )
+    if intrinsics_override is not None:
+        intr[0, 2] -= x1
+        intr[1, 2] -= y1
     sx, sy = image_size / orig_w, image_size / orig_h
-    intr[0, 0] *= sx
-    intr[1, 1] *= sy
-    intr[0, 2] *= sx
-    intr[1, 2] *= sy
+    intr[0, :] *= sx
+    intr[1, :] *= sy
     intr_tensor = torch.from_numpy(intr).unsqueeze(0)
 
     return rgb_tensor, mask_tensor, intr_tensor
@@ -631,15 +635,16 @@ def preprocess_clip_for_model(
 
     orig_h, orig_w = rgba_cropped[0].shape[:2]
     intr = (
-        intrinsics_override.copy()
+        np.asarray(intrinsics_override, dtype=np.float32).copy()
         if intrinsics_override is not None
         else make_default_intrinsics(orig_h, orig_w)
     )
+    if intrinsics_override is not None:
+        intr[0, 2] -= x1
+        intr[1, 2] -= y1
     sx, sy = image_size / orig_w, image_size / orig_h
-    intr[0, 0] *= sx
-    intr[1, 1] *= sy
-    intr[0, 2] *= sx
-    intr[1, 2] *= sy
+    intr[0, :] *= sx
+    intr[1, :] *= sy
     intr_tensor = torch.from_numpy(intr).unsqueeze(0)
 
     return rgb_clip, mask_clip, intr_tensor, rgb_frames

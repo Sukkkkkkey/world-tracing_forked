@@ -33,14 +33,15 @@ def solve_intrinsics_from_xyz(
             return the horizontal field of view; ignored otherwise.
 
     Returns:
-        ``(K, fov_x_deg)`` where ``K`` is ``[3, 3]`` float32 (None if fewer
-        than 10 valid pixels) and ``fov_x_deg`` is the horizontal FoV in
+        ``(K, fov_x_deg)`` where ``K`` is ``[3, 3]`` float32 (None for
+        insufficient/degenerate data or nonpositive focal lengths), and FoV is in
         degrees.
     """
     if image_size is None:
         image_size = xyz_layer0.shape[1]
 
     valid = mask_layer0.copy().astype(bool)
+    valid &= np.isfinite(xyz_layer0).all(axis=-1)
     Z = xyz_layer0[..., 2]
     valid &= Z > 1e-6
     n_valid = int(valid.sum())
@@ -55,12 +56,14 @@ def solve_intrinsics_from_xyz(
     Zv = xyz_layer0[valid, 2].astype(np.float64)
 
     A_u = np.stack([X / Zv, np.ones(n_valid)], axis=1)
-    fx_cx, _, _, _ = np.linalg.lstsq(A_u, u, rcond=None)
+    fx_cx, _, rank_u, _ = np.linalg.lstsq(A_u, u, rcond=None)
     fx, cx = fx_cx
 
     A_v = np.stack([Y / Zv, np.ones(n_valid)], axis=1)
-    fy_cy, _, _, _ = np.linalg.lstsq(A_v, v, rcond=None)
+    fy_cy, _, rank_v, _ = np.linalg.lstsq(A_v, v, rcond=None)
     fy, cy = fy_cy
+    if rank_u < 2 or rank_v < 2 or not np.isfinite([fx, fy, cx, cy]).all() or fx <= 0 or fy <= 0:
+        return None, 0.0
 
     K = np.array(
         [

@@ -15,6 +15,11 @@ from dataclasses import dataclass
 
 import numpy as np
 
+# O-Voxel to_glb maps (x, y, z) canonical to (x, z, -y) in glTF.
+# Matrices act on column vectors; row-vector arrays use matrix.T.
+GLB_TO_CANONICAL = np.array([[1, 0, 0], [0, 0, -1], [0, 1, 0]], dtype=np.float64)
+GLB_TO_CANONICAL.setflags(write=False)
+
 
 @dataclass
 class CanonicalTransform:
@@ -27,7 +32,7 @@ class CanonicalTransform:
 
     so that the cloud lands inside ``[-half_target, half_target]^3`` ⊂
     ``[-0.5, 0.5]^3`` with its "front" (smallest ``z_cam``) facing the
-    TRELLIS yaw=0 camera.
+    negative canonical Y direction.
 
     Attributes:
         centroid: ``(3,)`` translation in canonical space (applied AFTER
@@ -40,6 +45,16 @@ class CanonicalTransform:
     centroid: np.ndarray  # (3,) -- applied AFTER axis remap
     scale: float
     axis_map: str = "cam2canonical_zup"
+
+    def __post_init__(self):
+        self.centroid = np.asarray(self.centroid, dtype=np.float64)
+        self.scale = float(self.scale)
+        if self.centroid.shape != (3,) or not np.isfinite(self.centroid).all():
+            raise ValueError("centroid must be a finite 3-vector")
+        if not np.isfinite(self.scale) or self.scale <= 0:
+            raise ValueError("scale must be finite and positive")
+        if self.axis_map not in ("cam2canonical_zup", "identity", "y_flip", None):
+            raise ValueError(f"Unknown axis_map: {self.axis_map}")
 
     def _apply_axis_map(self, xyz: np.ndarray) -> np.ndarray:
         if self.axis_map == "cam2canonical_zup":
@@ -54,14 +69,14 @@ class CanonicalTransform:
 
     def apply(self, xyz: np.ndarray) -> np.ndarray:
         """Camera XYZ → canonical XYZ."""
-        out = self._apply_axis_map(xyz)
-        out = out - self.centroid[None, :]
+        out = self._apply_axis_map(np.asarray(xyz))
+        out = out - self.centroid
         out = out * self.scale
         return out
 
     def to_dict(self) -> dict:
         return {
-            "centroid": self.centroid.astype(np.float32).tolist(),
+            "centroid": self.centroid.tolist(),
             "scale": float(self.scale),
             "axis_map": self.axis_map,
         }
@@ -81,8 +96,13 @@ def compute_canonical_transform(
             keeping a small margin inside the [-0.5, 0.5] cube).
         axis_map: orientation convention (see :class:`CanonicalTransform`).
     """
-    if cloud_cam.size == 0:
-        raise ValueError("compute_canonical_transform: empty cloud")
+    cloud_cam = np.asarray(cloud_cam, dtype=np.float64)
+    if cloud_cam.ndim != 2 or cloud_cam.shape[1] != 3 or cloud_cam.size == 0:
+        raise ValueError("compute_canonical_transform: expected nonempty (N, 3) cloud")
+    if not np.isfinite(cloud_cam).all():
+        raise ValueError("compute_canonical_transform: nonfinite cloud")
+    if not 0 < half_target < 0.5:
+        raise ValueError("half_target must be in (0, 0.5)")
     tf = CanonicalTransform(
         centroid=np.zeros(3, dtype=np.float32),
         scale=1.0,
@@ -94,7 +114,7 @@ def compute_canonical_transform(
     half_extent = float(np.abs(centered).max())
     scale = half_target / max(half_extent, 1e-6)
     return CanonicalTransform(
-        centroid=centroid.astype(np.float32),
+        centroid=centroid,
         scale=scale,
         axis_map=axis_map,
     )
@@ -109,7 +129,7 @@ def canon_inverse(
     camera (e.g. side-by-side comparison with the raw point cloud).
     """
     v = np.asarray(v_canon, dtype=np.float64)
-    v = v / float(tf.scale) + tf.centroid[None, :].astype(np.float64)
+    v = v / float(tf.scale) + tf.centroid
     if tf.axis_map == "cam2canonical_zup":
         v_cam = np.stack([v[..., 0], -v[..., 2], v[..., 1]], axis=-1)
     elif tf.axis_map in ("identity", None):
@@ -125,19 +145,26 @@ def canon_inverse(
 def aggregate_camera_cloud(
     xyz_cam: np.ndarray,
     mask: np.ndarray,
-    max_points: int = 400_000,
+    max_points: int | None = None,
     seed: int = 0,
 ) -> np.ndarray:
     """Flatten ``[L, H, W, 3]`` + ``[L, H, W]`` mask → ``(N, 3)`` cloud.
 
-    Drops non-finite points and randomly subsamples to ``max_points`` if
-    the cloud is larger.  The subsampling RNG is seeded for determinism.
+    Drops non-finite points. By default keeps ALL points so fitting a
+    canonical transform cannot miss extrema. Explicit ``max_points``
+    enables deterministic subsampling for visualization, not scale fitting.
     """
-    pts = xyz_cam[mask.astype(bool)]
+    xyz_cam = np.asarray(xyz_cam)
+    mask = np.asarray(mask, dtype=bool)
+    if xyz_cam.ndim != 4 or xyz_cam.shape[-1] != 3 or mask.shape != xyz_cam.shape[:-1]:
+        raise ValueError("Expected xyz (L, H, W, 3) and matching mask (L, H, W)")
+    if max_points is not None and max_points <= 0:
+        raise ValueError("max_points must be positive or None")
+    pts = xyz_cam[mask]
     pts = pts[np.isfinite(pts).all(axis=1)]
     if len(pts) == 0:
         return pts
-    if pts.shape[0] > max_points:
+    if max_points is not None and pts.shape[0] > max_points:
         sel = np.random.RandomState(seed).choice(
             pts.shape[0], max_points, replace=False
         )
@@ -145,9 +172,21 @@ def aggregate_camera_cloud(
     return pts.astype(np.float32)
 
 
+def glb_to_camera(vertices: np.ndarray, tf: CanonicalTransform) -> np.ndarray:
+    """Undo O-Voxel's glTF axis rotation, then restore WT coordinates/scale.
+
+    ``vertices`` must already include any GLB scene-node transforms. This
+    restores the WT frame, not ground-truth geometry or unknown scene units.
+    """
+    canonical = np.asarray(vertices) @ GLB_TO_CANONICAL.T
+    return canon_inverse(canonical, tf)
+
+
 __all__ = [
+    "GLB_TO_CANONICAL",
     "CanonicalTransform",
     "aggregate_camera_cloud",
     "canon_inverse",
     "compute_canonical_transform",
+    "glb_to_camera",
 ]

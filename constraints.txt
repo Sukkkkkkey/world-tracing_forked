@@ -1,0 +1,16 @@
+# Common ABI/API constraints for WT + TRELLIS.2 inference on this host.
+torch==2.6.0
+torchvision==0.21.0
+numpy==1.26.4
+opencv-python==4.11.0.86
+transformers==4.57.6
+huggingface_hub==0.36.2
+rerun-sdk==0.22.1
+viser==1.1.1
+openpyxl==3.1.5
+pyarrow==19.0.1
+flash-attn==2.7.3
+plyfile<1.1.4
+
+# Preserve the historical inference/evaluation package versions.
+-c requirements.recovery.txt

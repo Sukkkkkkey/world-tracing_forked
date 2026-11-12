@@ -1,0 +1,181 @@
+{
+  "files": [
+    {
+      "path": "model/ckpts/shape_dec_next_dc_f16c32_fp16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/shape_dec_next_dc_f16c32_fp16.json",
+      "size": 678,
+      "sha256": null,
+      "blob_id": "e46164e905de0e68328f5f4b1f128b8dac608d97"
+    },
+    {
+      "path": "model/ckpts/shape_dec_next_dc_f16c32_fp16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/shape_dec_next_dc_f16c32_fp16.safetensors",
+      "size": 948490494,
+      "sha256": "e3b718d3e43e4f8780e9a24ac6fff231811a67e3b058e336e10fe654c911d581",
+      "blob_id": "02d838181e97a353f87119459cb80bdffb5f7d50"
+    },
+    {
+      "path": "model/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.json",
+      "size": 535,
+      "sha256": null,
+      "blob_id": "3628c8f5d6014a2f06d2b66162040fe84a94cbd9"
+    },
+    {
+      "path": "model/ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/slat_flow_img2shape_dit_1_3B_1024_bf16.safetensors",
+      "size": 5546764048,
+      "sha256": "3e6d1df0e62bc5bc863320d1d63d6b996235eef4abb8b851e878c88f316369f1",
+      "blob_id": "4202bf811a1336361ba8489a67aa71a38963fca9"
+    },
+    {
+      "path": "model/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.json",
+      "size": 535,
+      "sha256": null,
+      "blob_id": "464b1fce1a9b03b3621d31660d93ece908b55a8f"
+    },
+    {
+      "path": "model/ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/slat_flow_img2shape_dit_1_3B_512_bf16.safetensors",
+      "size": 5546764048,
+      "sha256": "63569838c1da93f010e2fa805b202ecf802cc758830230abac202a81b70e5b45",
+      "blob_id": "4f842225fe13f45192df1d2518fdd02457d6ab90"
+    },
+    {
+      "path": "model/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.json",
+      "size": 535,
+      "sha256": null,
+      "blob_id": "c751d7b73cecd548aa2df78a0b019205e730dda4"
+    },
+    {
+      "path": "model/ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/slat_flow_imgshape2tex_dit_1_3B_1024_bf16.safetensors",
+      "size": 5546960656,
+      "sha256": "65df179ad02f9e92bc18335d7861fadd95f268e6249217352468dd83cb79d1d0",
+      "blob_id": "3fe8b270f50d62fbc403082c66361cfb55cb5a18"
+    },
+    {
+      "path": "model/ckpts/ss_dec_conv3d_16l8_fp16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/ss_dec_conv3d_16l8_fp16.json",
+      "size": 245,
+      "sha256": null,
+      "blob_id": "9f3affaf13ab29fe48105229da9fab72ea8de716"
+    },
+    {
+      "path": "model/ckpts/ss_dec_conv3d_16l8_fp16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/ss_dec_conv3d_16l8_fp16.safetensors",
+      "size": 147591972,
+      "sha256": "1c76d4a40519aa2d711cc263a8404105231ac26db31d946bed48b84fee79009a",
+      "blob_id": "a4b577752af35caab154c83b72427d9cc92285f6"
+    },
+    {
+      "path": "model/ckpts/ss_flow_img_dit_1_3B_64_bf16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/ss_flow_img_dit_1_3B_64_bf16.json",
+      "size": 503,
+      "sha256": null,
+      "blob_id": "90b55ed8a6febe9b67a0b7f98bfe76f54ae44f46"
+    },
+    {
+      "path": "model/ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/ss_flow_img_dit_1_3B_64_bf16.safetensors",
+      "size": 5359822584,
+      "sha256": "6d0147bb347eb61fa81c304cc68c7fd69d447e91870357a549b47e1d0fd77242",
+      "blob_id": "cfe74061bd0f9fa0e328601cb2ee0624fa8f68e4"
+    },
+    {
+      "path": "model/ckpts/tex_dec_next_dc_f16c32_fp16.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/tex_dec_next_dc_f16c32_fp16.json",
+      "size": 705,
+      "sha256": null,
+      "blob_id": "e17107bef522e2aded7b3bc22ef421b57e16e779"
+    },
+    {
+      "path": "model/ckpts/tex_dec_next_dc_f16c32_fp16.safetensors",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "ckpts/tex_dec_next_dc_f16c32_fp16.safetensors",
+      "size": 948458812,
+      "sha256": "97ea69addea2ecd9312910f5f548234665eef51c088386180b7cd5b258645e3c",
+      "blob_id": "726b2552de2b71756fcd6490486c7ec38060b899"
+    },
+    {
+      "path": "model/pipeline.json",
+      "repo": "TencentARC/Pixal3D",
+      "revision": "b0cb2e1b794cab9aa0ac38a95d794a4d9337437f",
+      "filename": "pipeline.json",
+      "size": 4068,
+      "sha256": null,
+      "blob_id": "6fe7f4717ab2bae9c51eeb7f8e3e78e0ae520ac5"
+    },
+    {
+      "path": "moge/model.pt",
+      "repo": "Ruicheng/moge-2-vitl",
+      "revision": "39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+      "filename": "model.pt",
+      "size": 1305030700,
+      "sha256": "3eefd4abb2102f38f12b2d1992e5ff15e4923e5431c67dd494afe157e0111cd5",
+      "blob_id": "fe925254484a13e5ad5c01308f42dc08e3ed1f2d"
+    },
+    {
+      "path": "dinov3/config.json",
+      "repo": "camenduru/dinov3-vitl16-pretrain-lvd1689m",
+      "revision": "3c276edd87d6f6e569ff0c4400e086807d0f3881",
+      "filename": "config.json",
+      "size": 745,
+      "sha256": null,
+      "blob_id": "ab2a8b183fd4fd5213e9898a7f499c7c857b1a86"
+    },
+    {
+      "path": "dinov3/model.safetensors",
+      "repo": "camenduru/dinov3-vitl16-pretrain-lvd1689m",
+      "revision": "3c276edd87d6f6e569ff0c4400e086807d0f3881",
+      "filename": "model.safetensors",
+      "size": 1212559808,
+      "sha256": "dcb2e45127cccbf1601e5f42fef165eea275c8e5213197e8dcf3f48822718179",
+      "blob_id": "5fe30316feaa07b25590197bfad7216e9747863d"
+    },
+    {
+      "path": "dinov3/preprocessor_config.json",
+      "repo": "camenduru/dinov3-vitl16-pretrain-lvd1689m",
+      "revision": "3c276edd87d6f6e569ff0c4400e086807d0f3881",
+      "filename": "preprocessor_config.json",
+      "size": 585,
+      "sha256": null,
+      "blob_id": "0126173c1ab7b75bbd9102e37de8a56ffe0a012b"
+    },
+    {
+      "path": "naf/naf_release.pth",
+      "url": "https://github.com/valeoai/NAF/releases/download/model/naf_release.pth",
+      "size": 2664431,
+      "sha256": "c096c1ab2217a5c3ac136365f721685e2201379cb69d509cfb0261183847c98f"
+    }
+  ]
+}

@@ -35,7 +35,10 @@ import subprocess
 from pathlib import Path
 
 import numpy as np
+from wt.artifacts import save_npz
 import torch
+
+from wt.paths import output_path
 
 from wt import inference_video_diffusion
 from wt.checkpoint import build_model_and_load_ckpt
@@ -137,7 +140,7 @@ def main():
     p.add_argument(
         "--seeds", default=None, help="Comma-separated seeds (default: all reference seeds)."
     )
-    p.add_argument("--out", type=Path, default=Path("check_reproduction_out"))
+    p.add_argument("--out", type=Path, default=output_path("check_reproduction"))
     args = p.parse_args()
 
     if not torch.cuda.is_available():
@@ -168,7 +171,7 @@ def main():
     for clip in clips:
         ref = np.load(ref_root / clip / "reference.npz")
         rgb, depth, mask = predict(model, cfg, ref_root / clip / "frames", seeds, device)
-        np.savez_compressed(
+        save_npz(
             args.out / f"{clip}.npz", seeds=np.array(seeds), rgb=rgb, depth=depth, mask=mask
         )
 

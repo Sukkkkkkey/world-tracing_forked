@@ -1,0 +1,8 @@
+name: world_tracing_pixal3d
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+# This host uses setup.sh prepare to clone the verified world_tracing environment.
+# Creating this minimal YAML alone does NOT install the TRELLIS CUDA extensions.

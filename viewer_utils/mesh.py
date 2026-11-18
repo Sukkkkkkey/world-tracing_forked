@@ -1,5 +1,6 @@
 """Local mesh formats, material resources and export preparation (read-only)."""
 import io
+import re
 from pathlib import Path
 import shlex
 from urllib.parse import unquote, urlsplit
@@ -86,7 +87,15 @@ def obj_stream(stream, resolver):
             except OSError:
                 continue
             mtl_parent = (resolver.parent / name).resolve().parent
-            for material_line in mtl.splitlines():
+            material_lines = []
+            for material in re.split(r"(?m)(?=^\s*newmtl\s)", mtl):
+                lines = material.splitlines()
+                directives = {line.split()[0].lower() for line in lines if line.strip()}
+                # Map-only scan materials use unit diffuse to retain texture RGB.
+                if 'map_kd' in directives and 'kd' not in directives:
+                    lines.append('Kd 1 1 1')
+                material_lines.extend(lines)
+            for material_line in material_lines:
                 tokens = material_line.strip().split(maxsplit=1)
                 if tokens and tokens[0].lower() == 'map_kd' and len(tokens) == 2:
                     image_name = tokens[1].strip().strip('"').replace('\\', '/')

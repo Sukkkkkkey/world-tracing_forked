@@ -64,6 +64,12 @@ GSO 输入按固定相机渲染：1024²、FoV 40°、俯仰 20°、逐资产固
 - 输出：`/mnt/oss1/lemonade_factory/SYNC/shuqiliu/output/world_tracing/experiments/<实验>/samples/<样本>/<方法>/<配置>/seed-0042/`；Viser 使用 `--experiment` 按样本/方法/配置/seed 比较。
 - 汇总：仓库根目录 `experiments.xlsx`，记录两轮实验名称、参数、逐样本指标、汇总与失败原因；JSON/CSV 为可重建的数据源。方案仅保留设计，执行进度/日志记入 RUNBOOK、PROGRESS。
 
+**2026-11-11 确定性设置检查**
+
+- 项目锁定的 TRELLIS.2 `75fbf018`、Pixal3D `f7cf3842` 均在推理 pipeline 调用 `torch.manual_seed(seed)`，确定性算法开关沿用环境默认值。[TRELLIS.2 源码](https://github.com/microsoft/TRELLIS.2/blob/75fbf0183001ed9876c8dbb35de6b68552ee08bd/trellis2/pipelines/trellis2_image_to_3d.py#L538) · [Pixal3D 源码](https://github.com/TencentARC/Pixal3D/blob/f7cf38429b0bd264f1995f0f8743a88b1c728b94/pixal3d/pipelines/pixal3d_image_to_3d.py#L671)
+- 两套项目环境（PyTorch 2.6.0+cu124）的新进程实测均为 `deterministic_algorithms=False`、`cudnn.deterministic=False`、`cudnn.benchmark=False`，`CUBLAS_WORKSPACE_CONFIG` 未设置。项目调用层另重置 Python、NumPy、Torch/CUDA RNG。
+- 固定 seed 的复现范围仍受算子实现、数值精度和硬件影响。WT 波动较大的具体原因仍需受控对照验证。
+
 ---
 
 ## 附录 A：依据、数据与采样细节

@@ -17,12 +17,12 @@ from wt.experiment import atomic_json, digest, file_digest, identifier
 from wt.paths import DATA_ROOT
 
 
-def prepare(dataset, split_name, asset_up):
+def prepare(dataset, split_name, asset_up, *, dataset_name="gso-v1", render_protocol="gso-render-v1"):
     dataset = Path(dataset)
     inventory = {x['asset_id']: x for x in map(json.loads, (dataset/'inventory.jsonl').read_text().splitlines())}
     split = json.loads((dataset/'split.json').read_text())
     source = Path(__file__).resolve().parents[1]
-    config = dict(protocol='gso-render-v1', asset_up=asset_up, normalization='asset-AABB-diagonal=1',
+    config = dict(protocol=render_protocol, asset_up=asset_up, normalization='asset-AABB-diagonal=1',
                   resolution=1024, eval_resolution=504, horizontal_fov=40., elevation=20.,
                   sphere_radius=.5, distance_margin=1.2, lighting='unit ambient, texture sRGB unchanged',
                   alpha='opaque center sample, no AA', depth='linear camera Z', faces='double-sided',
@@ -75,9 +75,14 @@ def prepare(dataset, split_name, asset_up):
         atomic_json(dest/'render_config.json', config)
         files = ['input.png','gt_depth_original.npz','gt_depth.npz','gt_world.ply','gt_camera.ply','gt_points.npz','camera.json','render_config.json']
         value = dict(sample_id=asset_id, asset_id=asset_id, image=str((dest/'input.png').resolve()), split=split_name,
-                     dataset='gso-v1', ground_truth=dict(path=str((dest/'gt_camera.ply').resolve()), kind='mesh',frame='camera_rdf'),
+                     dataset=dataset_name, ground_truth=dict(path=str((dest/'gt_camera.ply').resolve()), kind='mesh',frame='camera_rdf'),
                      evaluation_dir=str(dest.resolve()), render_config_hash=config_hash,
                      artifact_sha256={name:file_digest(dest/name) for name in files})
+        for key in ("category", "source_mesh_sha256"):
+            if key in asset:
+                value[key] = asset[key]
+        if "archive_sha256" in asset:
+            value["source_archive_sha256"] = asset["archive_sha256"]
         atomic_json(entry,value)
         manifest.append(value)
         print(f'{split_name} {len(manifest)} {asset_id}: rendered',flush=True)

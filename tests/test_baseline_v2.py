@@ -199,11 +199,14 @@ def test_candidate_failure_rate_keeps_pending_budget_explicit():
 
 
 @pytest.mark.parametrize("mode", ["formal", "calibration", "fixed_seed"])
-def test_markdown_reports_raw_rmse_and_all_ssi_depth_metrics(mode):
+def test_markdown_assigns_depth_to_visible_and_multiview_sections(mode):
     from examples.summarize_baseline_v2 import markdown
 
     values = {
         "surfel.input.depth_rmse": {"mean": .061, "n": 100},
+        "surfel.input.depth_absrel": {"mean": .023, "n": 100},
+        "surfel.input.depth_delta1": {"mean": .98, "n": 100},
+        "surfel.input.depth_delta2": {"mean": .999, "n": 100},
         "surfel.multiview.depth_rmse": {"mean": .072, "n": 100},
         **{f"surfel.input_ssi.{metric}": {"mean": value, "n": 63}
            for metric, value in (("mae", .026), ("rmse", .041), ("absrel", .016),
@@ -217,9 +220,23 @@ def test_markdown_reports_raw_rmse_and_all_ssi_depth_metrics(mode):
     }
     output = markdown(report)
     assert "0.061000 (n=100)" in output
-    assert "0.072000 (n=100)" in output
-    ssi = output.split("### 输入深度 SSI", 1)[1].split("## 产物", 1)[0]
-    assert "| MAE | RMSE | AbsRel | δ<1.25 | δ<1.25² |" in ssi
+    assert "0.072000 (n=100)" not in output
+    visible = output.split("### Visible depth", 1)[1].split("### 输入视角", 1)[0]
+    assert "| MAE | RMSE | AbsRel | δ1 | δ2 |" in visible
+    assert "深度覆盖" not in visible
+    assert "0.023000 (n=100)" in visible
+    assert "0.980000 (n=100) | 0.999000 (n=100)" in visible
+    input_view = output.split("### 输入视角 · 深度图、轮廓与法线", 1)[1].split("### 30 视角", 1)[0]
+    assert "深度图 RMSE" in input_view and "深度图 PSNR" in input_view
+    assert "深度图 LPIPS" in input_view and "法线图 RMSE" in input_view
+    assert "法线 MSE" not in input_view
+    assert "深度覆盖" in input_view
+    multiview = output.split("### 30 视角", 1)[1].split("## 历史诊断", 1)[0]
+    assert "深度图 RMSE" in multiview and "深度覆盖" in multiview
+    assert "AbsRel" not in multiview and "δ1" not in multiview and "| MAE |" not in multiview
+    assert "Silhouette IoU" in input_view and "RGB PSNR" in input_view
+    ssi = output.split("## 历史诊断", 1)[1].split("## 产物", 1)[0]
+    assert "| MAE | RMSE | AbsRel | δ1 | δ2 |" in ssi
     assert "| 0.026000 (n=63) | 0.041000 (n=63) | 0.016000 (n=63)" in ssi
     assert "0.997500 (n=63) | 1.000000 (n=63)" in ssi
     assert "覆盖率门槛为 95%" in ssi
@@ -228,5 +245,70 @@ def test_markdown_reports_raw_rmse_and_all_ssi_depth_metrics(mode):
         assert "Best-of-8" not in output
 
     report["groups"][0]["metrics"] = {}
-    missing = markdown(report).split("### 输入深度 SSI", 1)[1].split("## 产物", 1)[0]
-    assert "| wt | points | N/A | N/A | N/A | N/A | N/A |" in missing
+    missing = markdown(report)
+    assert "## 历史诊断" not in missing
+    visible = missing.split("### Visible depth", 1)[1].split("### 输入视角", 1)[0]
+    assert "| wt | points | N/A | N/A | N/A | N/A | N/A |" in visible
+
+
+def test_cached_depth_review_reproduces_legacy_masks_and_equal_view_means(tmp_path):
+    from evaluation.multiview import depth_frame_metrics
+    from examples.review_cached_depth import inspect_asset, load_depth_groups, review_depth_groups
+    from wt.experiment import file_digest
+
+    truth = {"input": {"depth": np.ones((1, 2, 2)), "mask": np.ones((1, 2, 2), bool)},
+             "multiview": {"depth": np.ones((2, 2, 2)), "mask": np.ones((2, 2, 2), bool)}}
+    prediction = {group: {name: value.copy() for name, value in maps.items()}
+                  for group, maps in truth.items()}
+    prediction["input"]["depth"] += .1
+    prediction["multiview"]["depth"][1] += .5
+    prediction["multiview"]["mask"][1, 0, :] = False
+    stored = {}
+    for group in truth:
+        views = []
+        for index in range(len(truth[group]["depth"])):
+            metrics = depth_frame_metrics(
+                {name: value[index] for name, value in prediction[group].items()},
+                {name: value[index] for name, value in truth[group].items()},
+            )
+            for name in ("depth_absrel", "depth_delta1", "depth_delta2"):
+                metrics["metrics"].pop(name)
+            views.append(metrics)
+        stored[group] = views[0] if group == "input" else {"views": views}
+    cache = tmp_path / "surfel.npz"
+    np.savez_compressed(cache, **{f"{group}_{name}": value for group, maps in prediction.items()
+                                  for name, value in maps.items()})
+    loaded = load_depth_groups(cache, file_digest(cache))
+    reviewed = review_depth_groups(loaded, truth, stored)
+    assert reviewed["input"]["metrics"]["depth_absrel"] == pytest.approx(.1)
+    multi = {row["metric"]: row for row in reviewed["multiview"]["metrics"]}
+    assert multi["depth_absrel"]["value"] == pytest.approx(.25)
+    assert multi["depth_delta1"]["value"] == .5
+    assert multi["depth_coverage"]["value"] == .75
+    with pytest.raises(ValueError, match="digest mismatch"):
+        load_depth_groups(cache, "wrong")
+    from wt.experiment import atomic_json
+    target_dir = tmp_path / "gt"
+    target_dir.mkdir()
+    target_cache = target_dir / "geometry.npz"
+    np.savez_compressed(target_cache, **{f"{group}_{name}": value for group, maps in truth.items()
+                                         for name, value in maps.items()})
+    reference_path = target_dir / "result.json"
+    atomic_json(reference_path, {"files": {"geometry.npz": file_digest(target_cache)},
+                                 "cameras": [{"id": "input"}]})
+    result_path = tmp_path / "result.json"
+    atomic_json(result_path, {
+        "status": "complete", "reference": str(reference_path),
+        "files": {"surfel.npz": file_digest(cache)},
+        "comparisons": {"surfel": stored, "surfel_vs_native": stored},
+        "registration": {"matrix": np.eye(4).tolist()},
+    })
+    rows = inspect_asset([{
+        "sample_id": "asset", "method": "wt", "config_id": "default", "seed": 42,
+        "stage": "points", "result_path": str(result_path),
+        "result_sha256": file_digest(result_path),
+    }])
+    assert len(rows) == 1 and set(rows[0]["comparisons"]) == {"surfel"}
+    stored["input"]["metrics"]["depth_mae"] += .01
+    with pytest.raises(AssertionError):
+        review_depth_groups(loaded, truth, stored)

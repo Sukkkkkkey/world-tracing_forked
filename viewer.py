@@ -12,6 +12,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from pathlib import Path
 import json
+import os
 import signal
 import threading
 import time
@@ -24,8 +25,9 @@ import viser
 from viewer_utils.glb import GRAY, depth_colors, prepare_glb, UnsupportedGLB
 from viewer_utils.mesh import (LocalResolver, obj_stream, is_mesh_file,
                          split_materials, resource_signature, prepare_export_textures)
-from viewer_utils.gso import gso_display_source
+from viewer_utils.ground_truth import textured_gt_source
 from viewer_utils.experiments import experiment_layout, scan_viewer_experiment, seed_options
+from viewer_utils.evaluation_panel import EvaluationPanel
 
 from wt.experiment import resolve_reference
 
@@ -598,7 +600,8 @@ class MultiSelect:
 
 class ExperimentViewer:
     """One shared browser selection, small manifest index, bounded on-demand geometry loading."""
-    def __init__(self, server, root, max_points=None, quality='full', color_mode='surface'):
+    def __init__(self, server, root, max_points=None, quality='full', color_mode='surface',
+                 evaluation=None, evaluation_review=None):
         self.server, self.root, self.max_points = server, Path(root), max_points
         self.lock = threading.RLock()
         self.condition = threading.Condition(self.lock)
@@ -615,19 +618,25 @@ class ExperimentViewer:
         self.config = MultiSelect(server.gui, 'Config', config_ids, self.lock)
         seeds = seed_options(self.runs)
         self.seed = MultiSelect(server.gui, 'Seed', seeds, self.lock, initial_value=seeds[:1] if seeds else None)
-        self.restore = server.gui.add_checkbox('Restore WT frame', initial_value=True)
-        self.show_gt = server.gui.add_checkbox('Show ground truth', initial_value=True)
-        self.quality = server.gui.add_dropdown('Display quality', options=tuple(QUALITY), initial_value=quality)
-        self.color = server.gui.add_dropdown('Color mode', options=tuple(COLOR_MODES),
-            initial_value=next(label for label, value in COLOR_MODES.items() if value == color_mode))
-        server.gui.add_markdown(COLOR_HINT)
         self.artifact = server.gui.add_dropdown('Mesh representation', options=('Exported GLB', 'Decoded mesh'))
-        self.progress = server.gui.add_progress_bar(0)
-        self.status = server.gui.add_markdown('')
-        server.gui.add_markdown('Selections are shared across connected browsers. TRELLIS stays in its native frame; no GT alignment is performed.')
         server.gui.add_button('Previous sample').on_click(lambda _: self.move(-1))
         server.gui.add_button('Next sample').on_click(lambda _: self.move(1))
         server.gui.add_button('Refresh results').on_click(self.refresh)
+        tabs = server.gui.add_tab_group()
+        self.view_tab = tabs.add_tab('三维查看')
+        self.metrics_tab = tabs.add_tab('评测指标')
+        with self.view_tab:
+            self.restore = server.gui.add_checkbox('Restore WT frame', initial_value=True)
+            self.show_gt = server.gui.add_checkbox('Show ground truth', initial_value=True)
+            self.quality = server.gui.add_dropdown('Display quality', options=tuple(QUALITY), initial_value=quality)
+            self.color = server.gui.add_dropdown('Color mode', options=tuple(COLOR_MODES),
+                initial_value=next(label for label, value in COLOR_MODES.items() if value == color_mode))
+            server.gui.add_markdown(COLOR_HINT)
+            self.progress = server.gui.add_progress_bar(0)
+            self.status = server.gui.add_markdown('')
+            server.gui.add_markdown('Selections are shared across connected browsers. TRELLIS stays in its native frame; no GT alignment is performed.')
+        self.metrics = EvaluationPanel(server.gui, self.metrics_tab, self.root, self.lock,
+                                       evaluation, evaluation_review)
         for control in (self.sample, self.method, self.config, self.seed, self.restore, self.show_gt, self.artifact, self.quality, self.color):
             control.on_update(self.render)
         self.worker = threading.Thread(target=self._worker, name='viewer-loader', daemon=True)
@@ -639,6 +648,7 @@ class ExperimentViewer:
             self.closed = True
             self.version += 1
             self.condition.notify_all()
+        self.metrics.close()
         self.worker.join(timeout=2)
 
     def move(self, offset):
@@ -661,6 +671,7 @@ class ExperimentViewer:
             except (OSError, ValueError) as exc:
                 self.status.content = f'Refresh failed: {exc}'
                 return
+            self.metrics.refresh()
             value = self.sample.value
             self.sample.options = (SELECT_SAMPLE, *self.samples)
             self.sample.value = value if value in self.sample.options else SELECT_SAMPLE
@@ -676,6 +687,7 @@ class ExperimentViewer:
                 return
             self.version += 1
             if self.sample.value == SELECT_SAMPLE:
+                self.metrics.select('', (), 'glb')
                 self.pending = None
                 self.server.scene.reset()
                 if self.folder is not None:
@@ -690,6 +702,8 @@ class ExperimentViewer:
                         and r.method in self.method.value
                         and r.config_id in self.config.value
                         and str(r.seed) in self.seed.value]
+            stage = 'glb' if self.artifact.value == 'Exported GLB' else 'decoded'
+            self.metrics.select(self.sample.value, selected, stage)
             self.pending = (self.version, self.sample.value, dict(self.samples.get(self.sample.value, {})),
                             selected, self.restore.value, self.show_gt.value, self.artifact.value,
                             self.quality.value, list(self.errors), COLOR_MODES[self.color.value])
@@ -788,7 +802,8 @@ class ExperimentViewer:
             image = read_preview(sample.get('image_path'))
         with self.lock:
             report(1 / total, 'Input image ready')
-            self.folder = self.server.gui.add_folder('Selected results')
+            with self.view_tab:
+                self.folder = self.server.gui.add_folder('Selected results')
             with self.folder:
                 if image is not None:
                     self.server.gui.add_image(image, label=next(iter(input_views), 'Input image'), format='png')
@@ -835,7 +850,7 @@ class ExperimentViewer:
                 cache_mode = 'depth' if color_mode == 'depth' else 'native'
                 geometry = None
                 try:
-                    source = gso_display_source(sample, sample_dir)
+                    source = textured_gt_source(sample, sample_dir)
                     if source is not None:
                         mesh_path, asset_to_camera, metadata_paths = source
                         geometry = self._cached([mesh_path, *metadata_paths],
@@ -862,7 +877,8 @@ class ExperimentViewer:
             report((total - 1) / total, 'Sending prepared scene')
             if self.folder is not None:
                 self.folder.remove()
-            self.folder = self.server.gui.add_folder('Selected results')
+            with self.view_tab:
+                self.folder = self.server.gui.add_folder('Selected results')
             with self.folder:
                 populate_viewer(self.server, image, geometries, input_views)
             self.progress.value = 100
@@ -878,6 +894,8 @@ def parse_args(argv=None):
         epilog='Choose --experiment DIR, OR --image FILE --points FILE. Display limits never change saved results.')
     batch = parser.add_argument_group('Experiment / WT ablation browser (layout detected automatically)')
     batch.add_argument('--experiment', type=Path, help='experiment.json + samples/, or WT ablation <sample>/<config>/prediction.npz')
+    batch.add_argument('--evaluation', type=Path, help='Frozen evaluation directory containing index.json and plan.json; defaults to the experiment pointer')
+    batch.add_argument('--evaluation-review', type=Path, help='Directory containing verified depth/image/L0 review JSON files')
     files = parser.add_argument_group('Single-sample files (do not combine with --experiment)')
     files.add_argument('--image', type=Path, help='Required input image')
     files.add_argument('--points', type=Path, help='Required WT prediction: .rrd/.npy/.npz/.ply')
@@ -900,6 +918,8 @@ def parse_args(argv=None):
         parser.error('--max-points must be nonnegative')
     if not 0 <= args.port < 65536:
         parser.error('--port must be in 0..65535')
+    if (args.evaluation or args.evaluation_review) and not args.experiment:
+        parser.error('--evaluation and --evaluation-review require --experiment')
     if args.experiment:
         if any((args.image, args.points, args.mesh, args.gt, args.trellis,
                 args.entity, args.gt_entity, args.trellis_entity)):
@@ -919,6 +939,38 @@ def parse_args(argv=None):
     return args
 
 
+def add_exit_control(server, stopped):
+    """Request normal shutdown from either viewer mode."""
+    lock = threading.Lock()
+    closing = False
+    button = server.gui.add_button(
+        "退出可视化", color="red", hint="结束当前查看器会话及其绑定的端口转发")
+    status = server.gui.add_markdown("", visible=False)
+
+    @button.on_click
+    def request_exit(_):
+        nonlocal closing
+        with lock:
+            if closing or stopped.is_set():
+                return
+            closing = True
+            print("Viewer exit requested from browser.", flush=True)
+            button.disabled = True
+            button.label = "正在退出…"
+            status.content = "正在结束当前查看器，完成后可关闭此页面。"
+            status.visible = True
+            for client in server.get_clients().values():
+                client.add_notification(
+                    "正在退出可视化", "当前查看器会话正在关闭，绑定的端口转发将随之结束。",
+                    with_close_button=False, auto_close=False)
+            server.flush()
+            # Let the status update reach browsers before closing the socket.
+            timer = threading.Timer(0.3, stopped.set)
+            timer.daemon = True
+            timer.start()
+    return button
+
+
 def main():
     args = parse_args()
     limits = dict(max_points=QUALITY[args.quality][0] if args.max_points is None else args.max_points,
@@ -935,8 +987,10 @@ def main():
         server.gui.main_panel.dock_right()
         server.gui.main_panel.set_width(420)
         add_camera_controls(server)
+        add_exit_control(server, stopped)
         if args.experiment:
-            experiment = ExperimentViewer(server, args.experiment, args.max_points, args.quality, args.color_mode)
+            experiment = ExperimentViewer(server, args.experiment, args.max_points, args.quality, args.color_mode,
+                                          args.evaluation, args.evaluation_review)
         else:
             with Image.open(args.image) as image:
                 image_data = np.asarray(image.convert('RGBA'))
@@ -999,8 +1053,12 @@ def main():
         if args.port and port != args.port:
             print(f'Port {args.port} unavailable; using {port}.', flush=True)
         print(f'Viewer: http://127.0.0.1:{port}', flush=True)
-        print(f'Remote access: ssh -L {port}:127.0.0.1:{port} ali-dsw', flush=True)
-        print('Ctrl-C to stop.', flush=True)
+        print(f'Viewer PID: {os.getpid()}', flush=True)
+        remote = (f'cd {Path(__file__).resolve().parent} && .venv/bin/python -B '
+                  f'scripts/wait_viewer_exit.py --pid {os.getpid()}')
+        print(f'Remote access: ssh -T -o ExitOnForwardFailure=yes '
+              f"-L 127.0.0.1:{port}:127.0.0.1:{port} ali-dsw '{remote}'", flush=True)
+        print('Use 退出可视化 or Ctrl-C to stop.', flush=True)
         stopped.wait()
     finally:
         if experiment is not None:

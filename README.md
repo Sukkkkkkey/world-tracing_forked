@@ -52,7 +52,7 @@ viewer_utils/               查看器文件格式与数据布局适配
 ├── glb.py / mesh.py         GLB、mesh 材质/贴图读取与显示准备
 ├── experiments.py          标准实验与 ablation 索引分发
 ├── ablation.py             WT 消融输出目录与配置记录适配
-└── gso.py                  GSO 带纹理 GT 来源及坐标变换
+└── ground_truth.py         GSO / OmniObject3D 带纹理 GT 来源及坐标变换
 ```
 
 ## 环境与安装
@@ -129,6 +129,8 @@ CUDA_VISIBLE_DEVICES=0 python examples/infer_video.py \
 
 ## 网页查看
 
+简要操作、端口排查与完整关闭步骤见 [查看器使用说明](README_viewer.md)。
+
 批量推理在同一进程中先加载一次 WT 处理全部图像，再加载一次 TRELLIS.2 处理原生与 hybrid 结果。激活上述环境后，在专用 tmux 中运行：
 
 ```bash
@@ -165,11 +167,51 @@ python viewer.py \
   --mesh "$WT_OUTPUT_ROOT/validation/hybrid-cascade/briefcase.glb"
 ```
 
-打开终端打印的网址，默认 `http://127.0.0.1:8080`。HTTP 和 WebSocket 共用一个端口；仅监听 `127.0.0.1`，远程访问使用 `ssh -L 8080:127.0.0.1:8080 ali-dsw`。`--port` 指定端口，`--port 0` 自动选择空闲端口；指定端口被占用时会尝试后续端口，以终端打印值为准，相应调整 SSH 转发。`Ctrl-C` 停止服务，无后台子进程或临时录制文件。
+打开终端打印的网址，默认 `http://127.0.0.1:8080`。HTTP 和 WebSocket 共用一个端口；仅监听 `127.0.0.1`，远程访问使用启动日志中的 `Remote access` 命令，将 SSH 转发绑定到当前查看器进程。`--port` 指定端口，`--port 0` 自动选择空闲端口；指定端口被占用时会尝试后续端口，以终端打印值为准，相应调整 SSH 转发。页面顶部的“退出可视化”按钮或 `Ctrl-C` 会结束当前查看器会话，连接到该服务的浏览器会断开。
 
 页面分为左侧三维画布与右侧控制栏，控制栏默认宽 420 px，可拖动分隔线调整；画布不延伸到控制栏下方。侧栏显示输入图像。`--mesh`、`--gt`、`--trellis` 可省略；后两者接受点云或 mesh，例如 `--trellis /路径/trellis_output.glb`。3D 结果按接近方形的网格排列：4 项为 2×2，6 项为 2 行×3 列，9 项为 3×3；不足一行时居中，按最大几何尺寸统一留出间距。`View` 可切换单项并自动调整视角，支持旋转、缩放、点大小调整和视角重置。各结果仅为展示而居中、平移，保留原尺度，不作配准；源文件保持不变。
 
 画布左上角提供视角按钮：缩放 `− / ＋`、平移 `← → ↑ ↓`、旋转 `← → ↑ ↓`。缩放每次约 20%，平移沿当前屏幕方向移动视点，旋转以当前观察中心为轴每次 15°。按钮仅改变当前浏览器的相机，切换样本后仍保留；鼠标操作与右侧 Reset view 可继续使用。
+
+### 评测指标
+
+实验浏览器的右侧提供“三维查看”和“评测指标”页签，公共控件选择样本、方法、配置、seed 与输出阶段。评测页签按 Geometry（whole & visible）、Visible depth、Input view & multi-view 分类，各类下按指标展开对比表。每个指标表以方法为行，并列显示本样本、数据集均值、差值和有效资产数/计划资产数。同一方法的多个配置或 seed 分行显示，完整比较条件可展开“配置与 seed”查看。WT 的原像素 L0＋SSI 单列为补充。
+
+评测条件为完整形状 Sim(3)、D=1，渲染指标默认共同 Surfel，可切换 Native mesh 补充。均值按同方法、配置、seed、阶段与表示的有效资产等权计算。30-view 指标要求该资产全部视角有效。运行中的实验显示“当前有效样本均值”，总数取完整评测计划。点击 Refresh results 更新评测快照，切换样本复用已加载指标。缺失、失败和旧交集图像口径均在表下注明原因。
+
+默认读取实验内的 `baseline_evaluation.json`。GSO 推理与评测位于不同目录时，使用 `--evaluation` 关联。`--evaluation-review` 读取已通过版本及来源摘要核对的深度、整图图像和 L0＋SSI 复核文件。
+
+GSO R2 的完整 v0.5 指标可按以下方式打开。
+
+```bash
+source scripts/env.sh
+python viewer.py \
+  --experiment "$WT_OUTPUT_ROOT/experiments/20261013-R2-gso-quant-v1" \
+  --evaluation "$WT_OUTPUT_ROOT/evaluation/baseline-v2/d99fa356cec4eb52fb27/20261110-R2-gso-quant-eval-v0.5" \
+  --evaluation-review "$WT_OUTPUT_ROOT/validation/baseline-v05-r2-20261110" \
+  --port 18091
+```
+
+OOD 校准集使用协议更新后的复核目录。
+
+```bash
+python viewer.py \
+  --experiment "$WT_OUTPUT_ROOT/experiments/20261111-OOD-omni-pilot-v1" \
+  --evaluation-review "$WT_OUTPUT_ROOT/validation/ood-protocol-review-20261111" \
+  --port 18092
+```
+
+OOD 正式集自动关联实验指针，完成后生成的 L0 复核文件可通过刷新载入。
+
+```bash
+python viewer.py \
+  --experiment "$WT_OUTPUT_ROOT/experiments/20261112-OOD-omni-v2-eval100" \
+  --port 18093
+```
+
+每个预览使用独立的 SSH 转发连接。复制对应查看器启动日志中的完整 `Remote access` 命令执行即可。该命令通过 `scripts/wait_viewer_exit.py --pid` 等待当前查看器进程结束，页面点击“退出可视化”后，远端服务、对应 SSH 会话及本机转发端口依次关闭。进程身份检查包含启动时间，能够识别 PID 被重新使用的情况。
+
+退出后再次浏览时，重新启动查看器并执行新日志中的转发命令。VS Code Ports 管理的连接可先通过“Stop Forwarding Port”关闭，再使用上述绑定连接。
 
 命令行有两种互斥模式，`python viewer.py --help` 按以下用途分组：
 
@@ -182,6 +224,8 @@ python viewer.py \
 | `--quality fast / balanced / full` | 两种模式通用的显示预算，默认 full；实验模式也可在网页切换 |
 | `--color-mode gray / surface / depth` | 默认 surface（表面颜色），两种模式均可通过网页 Color mode 切换 |
 | `--max-points N` | 覆盖每份点云上限，0 表示全部点；不限制完整 mesh 面数 |
+| `--evaluation DIR` | 实验模式的评测目录，包含 index.json 与 plan.json |
+| `--evaluation-review DIR` | 实验模式的深度、整图图像及 L0＋SSI 复核目录 |
 | `--port N` | 网页与 WebSocket 共用端口，默认 8080，0 自动选择 |
 
 质量档位：默认 `full` 保留全部有效点、完整 mesh 和原始纹理。`balanced` 使用最多 5 万点、完整 mesh 拓扑、最长边 1024 px 纹理；GLB 沿用原顶点、面索引和法线，不把大 mesh 转成点云。`fast` 使用最多 2 万点、512 px 纹理，超过 5 万面的 mesh 使用明确标注的**顶点预览**。预算按每个结果计算，不减少比较数量，所有处理仅在内存中进行。默认 Exported GLB 以快速加载为目标；Decoded mesh、full、大量比较项或较慢的远程网络仍可能需要更久。
@@ -200,7 +244,7 @@ python viewer.py \
 
 Mesh 支持 GLB、GLTF、OBJ、PLY，以及只含几何的 STL/OFF。OBJ 需保留 MTL 和贴图目录，支持多个材质库、材质分组和相对路径；GLTF 可引用外部 BIN/图片或内嵌资源。PLY 有面时按 mesh 显示，可读取顶点颜色或 `TextureFile` + UV；无面时按点云显示。`--points` 始终按 WT 点云处理。贴图在内存中嵌入 GLB 后发送到网页，修改外部材质/贴图后刷新会重新加载；缺失资源在状态栏提示。普通 `map_Kd` 贴图路径受支持，带额外 MTL 贴图选项的写法会提示不支持。单文件模式的点云假定相机 RDF、mesh 假定 Y-up；实验模式按清单中的 kind/frame 读取。其他坐标约定须先转换。
 
-GSO 实验的 GT 优先通过 `evaluation_dir` 下的 `camera.json` 和数据集 `inventory.jsonl` 定位原始带纹理模型，并应用已保存的资产归一化和相机变换。原始模型或坐标信息不可用时，提示原因并回退到清单中的评测几何；评测 PLY、冻结清单和原始数据均不改写。其他数据集直接显示 `ground_truth` 指定的文件。
+GSO 与 OmniObject3D OOD v1/v2 实验的 GT 优先通过 `evaluation_dir` 下的 `camera.json` 和数据集 `inventory.jsonl` 定位原始带纹理模型，并应用已保存的资产归一化和相机变换。原始模型或坐标信息不可用时，提示原因并回退到清单中的评测几何；评测 PLY、冻结清单和原始数据均不改写。OmniObject3D 使用原始 `Scan.obj`、其声明的 MTL 和 JPEG/PNG 纹理，按冻结矩阵完成资产归一化、Y-up 轴向转换及输入相机定位。其他数据集直接显示 `ground_truth` 指定的文件。
 
 ## 输入与输出约定
 

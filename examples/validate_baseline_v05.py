@@ -19,10 +19,14 @@ from wt.paths import REPO_ROOT
 
 
 def check_frame_metrics(prediction, reference, stored, config):
-    actual = frame_metrics(prediction, reference, config)
+    metric_config = {**config, "image_metric_region": stored.get("image_metric_region", "valid_intersection")}
+    actual = frame_metrics(prediction, reference, metric_config)
     assert actual["pixels"] == stored["pixels"]
+    added_metrics = {"depth_absrel", "depth_delta1", "depth_delta2",
+                     "depth_image_rmse", "depth_image_psnr", "depth_image_lpips",
+                     "depth_image_clipped_fraction", "normal_rmse"}
     for name, value in actual["metrics"].items():
-        if name == "normal_lpips":
+        if name in {"normal_lpips", "depth_image_lpips"} or (name in added_metrics and name not in stored["metrics"]):
             continue
         expected = stored["metrics"][name]
         if value is None:

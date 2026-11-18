@@ -28,6 +28,7 @@ frozendict @ file:///croot/frozendict_1713194832637/work
 fsspec==2026.7.0
 glcontext==3.1.0
 grpcio==1.84.0
+h5py==3.14.0
 hf-xet==1.7.0
 huggingface_hub==0.36.2
 idna==3.20

@@ -35,9 +35,12 @@ def test_self_and_depth_metric_formula(config):
     shifted = frame_metrics(frame(2.1), base, config)["metrics"]
     assert shifted["depth_mae"] == pytest.approx(.1, abs=1e-6)
     assert shifted["depth_rmse"] == pytest.approx(.1, abs=1e-6)
+    assert shifted["depth_absrel"] == pytest.approx(.05, abs=1e-6)
+    assert shifted["depth_delta1"] == shifted["depth_delta2"] == 1
     angled = frame_metrics(frame(normal=(1, 0, 0)), base, config)["metrics"]
     assert angled["normal_mean_angle"] == pytest.approx(90)
     assert angled["normal_mse"] == pytest.approx(1 / 6)
+    assert angled["normal_rmse"] == pytest.approx(np.sqrt(1 / 6))
 
 
 def test_missing_geometry_retains_coverage_penalty(config):
@@ -45,7 +48,8 @@ def test_missing_geometry_retains_coverage_penalty(config):
     empty["mask"][:] = False
     metrics = frame_metrics(empty, base, config)["metrics"]
     assert metrics["depth_coverage"] == metrics["silhouette_iou"] == metrics["normal_coverage"] == 0
-    assert metrics["depth_mae"] is None
+    for name in ("depth_mae", "depth_rmse", "depth_absrel", "depth_delta1", "depth_delta2"):
+        assert metrics[name] is None
     empty["mask"][:8] = True
     metrics = frame_metrics(empty, base, config)["metrics"]
     assert metrics["silhouette_iou"] == metrics["depth_coverage"] == .5
@@ -167,7 +171,8 @@ def test_summary_counts_runs_whose_evaluation_failed(config):
     result = summarize([], planned, config)
     assert result["expected_runs"] == 2
     assert result["complete_runs"] == 0
-    assert result["failed_metrics"] == 27
+    from evaluation.multiview import METRIC_UNITS
+    assert result["failed_metrics"] == 3 * len(METRIC_UNITS)
     assert all(row["total"] == 1 for row in result["summary"])
     assert all(row["mean"] is None for row in result["summary"])
     wt_native = [r for r in result["summary"]
@@ -294,3 +299,195 @@ def test_baseline_uses_thirty_views_and_one_complete_shape_selector():
     assert multiview["view_count"] == 30
     assert multiview["camera_layout"] == "sphere-hammersley"
     assert len(cameras({"azimuth_degrees": 0}, multiview)) == 30
+
+
+def test_direct_depth_metrics_use_strict_thresholds_and_valid_pixels():
+    from evaluation.multiview import depth_frame_metrics
+    predicted = np.array([[1., 1.25, 1.25 ** 2, np.nan, 0., 2., np.inf]])
+    target = np.ones_like(predicted)
+    mask = np.ones_like(predicted, dtype=bool)
+    gt_mask = mask.copy()
+    gt_mask[0, 5] = False
+    result = depth_frame_metrics(
+        {"depth": predicted, "mask": mask}, {"depth": target, "mask": gt_mask},
+    )
+    values = result["metrics"]
+    assert values["depth_delta1"] == pytest.approx(1 / 3)
+    assert values["depth_delta2"] == pytest.approx(2 / 3)
+    assert values["depth_absrel"] == pytest.approx((.25 + .5625) / 3)
+    assert values["depth_coverage"] == .5
+    assert result["pixels"] == {"pred": 4, "gt": 6, "overlap": 3}
+
+
+def test_direct_depth_does_not_fit_affine_depth(config):
+    base = frame()
+    shifted = frame(4.)
+    result = frame_metrics(shifted, base, config)["metrics"]
+    assert result["depth_mae"] == result["depth_rmse"] == 2.
+    assert result["depth_absrel"] == 1.
+    assert result["depth_delta1"] == result["depth_delta2"] == 0.
+
+
+def test_depth_image_encoding_uses_shared_gt_limits_and_neutral_background(config):
+    from evaluation.multiview import depth_image_comparison
+    prediction, reference = frame(), frame()
+    reference["depth"][:] = np.linspace(1, 3, 256).reshape(16, 16)
+    prediction["depth"][:] = reference["depth"]
+    prediction["depth"][0, 0] = 10
+    prediction["mask"][0, 1] = False
+    comparison = depth_image_comparison(prediction, reference, config)
+    assert comparison["encoding"]["depth_limits_D"] == pytest.approx([.8, 3.2])
+    assert comparison["encoding"]["pred_clipped_pixels"] == 1
+    assert comparison["encoding"]["pred_valid_pixels"] == 255
+    np.testing.assert_array_equal(comparison["prediction_rgb"][0, 0], np.ones(3))
+    np.testing.assert_array_equal(comparison["prediction_rgb"][0, 1], np.zeros(3))
+    mask = prediction["mask"] & reference["mask"]
+    error = (comparison["prediction_rgb"][mask].astype(float)
+             - comparison["reference_rgb"][mask]) / 2
+    mse = np.mean(error ** 2)
+    assert comparison["metrics"]["depth_image_rmse"] == pytest.approx(np.sqrt(mse))
+    assert comparison["metrics"]["depth_image_psnr"] == pytest.approx(-10*np.log10(mse))
+
+
+def test_depth_image_empty_mask_and_constant_gt(config):
+    from evaluation.multiview import depth_image_comparison
+    prediction, reference = frame(), frame()
+    own = depth_image_comparison(prediction, reference, config)
+    assert own["encoding"]["depth_limits_D"] == pytest.approx([1.99, 2.01])
+    assert own["metrics"]["depth_image_rmse"] == 0
+    assert own["metrics"]["depth_image_psnr"] == 120
+    prediction["mask"][:] = False
+    empty = depth_image_comparison(prediction, reference, config)
+    assert empty["metrics"]["depth_image_rmse"] is None
+    assert empty["metrics"]["depth_image_psnr"] is None
+    np.testing.assert_array_equal(empty["prediction_rgb"], 0)
+
+
+def test_lpips_batch_and_single_use_the_same_rgb_encoding():
+    import torch
+    from evaluation.multiview import NormalLPIPS
+    metric = NormalLPIPS.__new__(NormalLPIPS)
+    metric.torch, metric.device = torch, "cpu"
+    metric.model = lambda left, right: ((left-right)**2).mean((1, 2, 3), keepdim=True)
+    prediction = np.zeros((2, 8, 8, 3), dtype=np.float32)
+    reference = prediction.copy()
+    prediction[1] = .5
+    values = metric.batch(prediction, reference)
+    assert values.tolist() == [0., .25]
+    assert metric(prediction[1], reference[1]) == .25
+
+
+def test_cached_image_batches_preserve_order_and_average_per_view_rmse(config):
+    from evaluation.multiview import depth_frame_metrics
+    from examples.review_cached_images import review_views, summarize_views
+
+    class Metric:
+        def batch(self, prediction, reference):
+            return np.mean((prediction-reference)**2, axis=(1, 2, 3))
+        def __call__(self, prediction, reference):
+            return float(self.batch(prediction[None], reference[None])[0])
+
+    gt = np.tile(np.linspace(1., 2., 16).reshape(1, 4, 4), (3, 1, 1))
+    target = {"depth": gt, "mask": np.ones_like(gt, dtype=bool)}
+    predicted = {"depth": gt + np.array([0., .02, .04])[:, None, None],
+                 "mask": np.ones_like(gt, dtype=bool)}
+    stored = []
+    for index, mse in enumerate([.01, .04, .09]):
+        row = depth_frame_metrics(
+            {name: value[index] for name, value in predicted.items()},
+            {name: value[index] for name, value in target.items()},
+        )
+        row["metrics"]["normal_mse"] = mse
+        stored.append(row)
+    frames, error = review_views(predicted, target, stored, config, Metric(), 2, True)
+    assert error == 0
+    assert frames[0]["metrics"]["depth_image_lpips"] == 0
+    assert 0 < frames[1]["metrics"]["depth_image_lpips"] < frames[2]["metrics"]["depth_image_lpips"]
+    rows = {row["metric"]: row for row in summarize_views(frames)["metrics"]}
+    assert rows["normal_rmse"]["value"] == pytest.approx(.2)
+    assert rows["normal_rmse"]["value"] != pytest.approx(np.sqrt(np.mean([.01, .04, .09])))
+    stored[0]["pixels"]["overlap"] -= 1
+    with pytest.raises(ValueError, match="pixel count"):
+        review_views(predicted, target, stored, config, Metric(), 2)
+
+
+def test_full_frame_image_errors_include_background_and_missing_normals(config):
+    from evaluation.multiview import depth_image_comparison, normal_image_comparison
+    prediction, reference = frame(), frame()
+    reference["depth"][:] = np.linspace(1, 3, 256).reshape(16, 16)
+    prediction["depth"][:] = reference["depth"]
+    prediction["mask"][:8] = False
+    prediction["normal_valid"][:8] = False
+    full_config = {**config, "image_metric_region": "full_frame"}
+    depth = depth_image_comparison(prediction, reference, full_config)
+    normal = normal_image_comparison(prediction, reference, full_config)
+    assert depth["metrics"]["depth_image_rmse"] > 0
+    assert normal["metrics"]["normal_rmse"] == pytest.approx(np.sqrt(1 / 24))
+    result = frame_metrics(prediction, reference, full_config)
+    assert result["metrics"]["depth_mae"] == 0
+    assert result["metrics"]["normal_mean_angle"] == 0
+    assert result["metrics"]["normal_rmse"] > 0
+    assert result["image_metric_region"] == "full_frame"
+    previous = depth_image_comparison(prediction, reference, config)
+    for name in ("prediction_rgb", "reference_rgb"):
+        np.testing.assert_array_equal(depth[name], previous[name])
+    assert previous["metrics"]["depth_image_rmse"] == 0
+
+
+def test_full_frame_errors_are_defined_with_empty_prediction(config):
+    full_config = {**config, "image_metric_region": "full_frame"}
+    prediction, reference = frame(), frame()
+    prediction["mask"][:] = False
+    result = frame_metrics(prediction, reference, full_config)
+    assert result["metrics"]["depth_mae"] is None
+    assert result["metrics"]["depth_image_rmse"] is not None
+    assert result["metrics"]["normal_rmse"] == pytest.approx(np.sqrt(1 / 12))
+    assert result["metrics"]["depth_coverage"] == 0
+
+
+def test_multiview_physical_depth_exclusion_is_explicit(config):
+    from evaluation.multiview import PHYSICAL_DEPTH_METRICS
+    reference = {key: np.stack([value] * 4) for key, value in frame().items()}
+    result = compare_views(reference, reference,
+                           {**config, "image_metric_region": "full_frame",
+                            "multiview_physical_depth_metrics": False})
+    names = {row["metric"] for row in result["metrics"]}
+    assert not names & PHYSICAL_DEPTH_METRICS
+    assert {"depth_coverage", "depth_image_rmse", "depth_image_psnr", "silhouette_iou"} <= names
+
+
+def test_full_frame_cache_update_reuses_identical_lpips_inputs(config):
+    from evaluation.multiview import depth_image_comparison, normal_image_comparison
+    from examples.review_fullframe_images import update_frame
+    prediction, reference = frame(), frame()
+    prediction["mask"][:8] = False
+    prediction["normal_valid"][:8] = False
+    reference["depth"][:] = np.linspace(1, 3, 256).reshape(16, 16)
+    prediction["depth"][:] = reference["depth"]
+    previous = frame_metrics(prediction, reference, config)
+    previous["metrics"]["depth_image_lpips"] = .123
+    previous["metrics"]["normal_lpips"] = .456
+    full_config = {**config, "image_metric_region": "full_frame"}
+    actual = update_frame(prediction, reference, previous, full_config)
+    expected = frame_metrics(prediction, reference, full_config)
+    for name in ("depth_image_rmse", "depth_image_psnr", "normal_mse", "normal_rmse", "normal_psnr"):
+        assert actual["metrics"][name] == pytest.approx(expected["metrics"][name])
+    assert actual["metrics"]["depth_image_lpips"] == .123
+    assert actual["metrics"]["normal_lpips"] == .456
+    for encoder in (depth_image_comparison, normal_image_comparison):
+        old = encoder(prediction, reference, config)
+        full = encoder(prediction, reference, full_config)
+        for name in ("prediction_rgb", "reference_rgb"):
+            np.testing.assert_array_equal(old[name], full[name])
+
+
+def test_generic_multiview_summary_respects_image_only_metric_selection(config):
+    from evaluation.multiview import multiview_metric_units
+    from examples.evaluate_multiview import summarize
+    selected = {**config, "multiview_physical_depth_metrics": False}
+    planned = [
+        {"method": method, "config_id": "a", "seed": 42, "config_hash": "h",
+         "parameter_hash": "p", "sample_id": "asset"} for method in ("wt", "trellis2")
+    ]
+    report = summarize([], planned, selected)
+    assert report["failed_metrics"] == 3 * len(multiview_metric_units(selected))

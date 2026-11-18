@@ -5,6 +5,7 @@ from pathlib import Path
 import time
 
 import numpy as np
+import pytest
 from PIL import Image
 import trimesh
 import viser
@@ -12,6 +13,7 @@ import viser
 import viewer
 from viewer_utils.mesh import split_materials
 from viewer_utils.gso import gso_display_source
+from viewer_utils.ground_truth import textured_gt_source
 
 
 def textured_obj(root):
@@ -163,7 +165,8 @@ def test_multi_material_faces_keep_textures_and_pose():
     assert texture_colors(unpack(packed)) == {(255, 0, 0), (0, 0, 255)}
 
 
-def test_gso_source_coordinates_and_missing_source_fallback(tmp_path):
+@pytest.mark.parametrize("dataset_name", ["gso-v1", "omniobject3d-ood-v1", "omniobject3d-ood-v2"])
+def test_gt_source_coordinates_and_missing_source_fallback(tmp_path, dataset_name):
     from wt.experiment import atomic_json
     source = textured_obj(tmp_path / 'source')
     dataset = tmp_path / 'dataset'
@@ -175,8 +178,8 @@ def test_gso_source_coordinates_and_missing_source_fallback(tmp_path):
     world_to_camera[:3, 3] = [1, 2, 3]
     atomic_json(evaluation / 'camera.json', {'T_asset_to_world': asset_to_world.tolist(),
                                            'T_world_to_camera': world_to_camera.tolist()})
-    sample = dict(dataset='gso-v1', asset_id='a', evaluation_dir=str(evaluation))
-    path, transform, metadata = gso_display_source(sample, tmp_path)
+    sample = dict(dataset=dataset_name, asset_id='a', evaluation_dir=str(evaluation))
+    path, transform, metadata = textured_gt_source(sample, tmp_path)
     geometry = viewer.read_geometry('GT', path, transform=viewer.display_transform('camera_rdf') @ transform)
     np.testing.assert_allclose(geometry.bounds, [[1, -4, -3], [3, -2, -3]])
     assert len(metadata) == 2
@@ -209,3 +212,65 @@ def test_gso_source_coordinates_and_missing_source_fallback(tmp_path):
     finally:
         browser.close()
         server.stop()
+
+
+def test_ood_source_uses_frozen_axis_scale_and_relative_paths(tmp_path):
+    from wt.experiment import atomic_json
+    source = textured_obj(tmp_path / 'source')
+    evaluation = tmp_path / 'dataset/samples/omni_test'
+    evaluation.mkdir(parents=True)
+    (tmp_path / 'dataset/inventory.jsonl').write_text(json.dumps({
+        'asset_id': 'omni_test', 'mesh': '../source/model.obj'}) + '\n')
+    asset_to_world = [[2, 0, 0, 4], [0, 0, -2, 5], [0, 2, 0, 6], [0, 0, 0, 1]]
+    world_to_camera = np.eye(4)
+    world_to_camera[:3, 3] = [-1, -2, 3]
+    atomic_json(evaluation / 'camera.json', {
+        'T_asset_to_world': asset_to_world,
+        'T_world_to_camera': world_to_camera.tolist()})
+    sample = dict(dataset='omniobject3d-ood-v2', asset_id='omni_test',
+                  evaluation_dir='dataset/samples/omni_test')
+    before = source.read_bytes()
+    path, transform, metadata = textured_gt_source(sample, tmp_path)
+    assert path.resolve() == source.resolve()
+    geometry = viewer.read_geometry('OOD GT', path, quality='full', color_mode='surface',
+                                   transform=viewer.display_transform('camera_rdf') @ transform)
+    np.testing.assert_allclose(geometry.bounds, [[3, -3, -11], [5, -3, -9]])
+    assert texture_colors(unpack(geometry)) == {(240, 20, 30), (20, 40, 230)}
+    assert source.read_bytes() == before
+    assert gso_display_source(sample, tmp_path) is None
+    assert len(metadata) == 2
+
+
+def test_unsupported_gt_dataset_keeps_declared_geometry(tmp_path):
+    assert textured_gt_source({'dataset': 'unrelated'}, tmp_path) is None
+
+
+@pytest.mark.parametrize('invalid', [np.zeros((3, 3)), np.full((4, 4), np.nan), np.zeros((4, 4))])
+def test_ood_invalid_camera_transform_is_reported(tmp_path, invalid):
+    evaluation = tmp_path / 'samples/a'
+    evaluation.mkdir(parents=True)
+    (tmp_path / 'inventory.jsonl').write_text(json.dumps({'asset_id': 'a', 'mesh': 'source.obj'}) + '\n')
+    (evaluation / 'camera.json').write_text(json.dumps({
+        'T_asset_to_world': invalid.tolist(), 'T_world_to_camera': np.eye(4).tolist()}))
+    sample = dict(dataset='omniobject3d-ood-v1', asset_id='a', evaluation_dir=str(evaluation))
+    with pytest.raises(ValueError, match='Invalid GT'):
+        textured_gt_source(sample, tmp_path)
+
+@pytest.mark.parametrize("diffuse,expected", [
+    ("", [1, 1, 1, 1]), ("Kd 0.2 0.4 0.6\n", [0.2, 0.4, 0.6, 1]),
+])
+def test_map_only_obj_materials_preserve_texture_color(tmp_path, diffuse, expected):
+    import struct
+    Image.new("RGB", (8, 8), (220, 40, 60)).save(tmp_path / "Scan.jpg")
+    material = tmp_path / "Scan.mtl"
+    material.write_text("newmtl scan\n" + diffuse + "map_Kd Scan.jpg\n")
+    source = tmp_path / "Scan.obj"
+    source.write_text("mtllib Scan.mtl\nv 0 0 0\nv 1 0 0\nv 0 1 0\n"
+                      "vt 0 0\nvt 1 0\nvt 0 1\nusemtl scan\nf 1/1 2/2 3/3\n")
+    before = material.read_bytes()
+    geometry = viewer.read_geometry("Scan", source, quality="full", color_mode="surface")
+    length = struct.unpack_from("<I", geometry.glb, 12)[0]
+    tree = json.loads(geometry.glb[20:20 + length])
+    np.testing.assert_allclose(tree["materials"][0]["pbrMetallicRoughness"]["baseColorFactor"], expected)
+    assert tree["textures"] and tree["images"]
+    assert material.read_bytes() == before

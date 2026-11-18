@@ -16,7 +16,7 @@ import trimesh
 
 from evaluation.geometry import transform_points
 from evaluation.multiview import (
-    METRIC_UNITS, NormalLPIPS, cameras, compare_views, prepare_surfels, render_views, sample_mesh,
+    NormalLPIPS, cameras, compare_views, multiview_metric_units, prepare_surfels, render_views, sample_mesh,
 )
 from evaluation.render import Rasterizer
 from wt.artifacts import atomic_artifact, save_npz
@@ -25,6 +25,7 @@ from wt.paths import CACHE_ROOT, OUTPUT_ROOT, REPO_ROOT, WEIGHTS_ROOT, configure
 
 SOURCES = (
     "examples/evaluate_multiview.py", "evaluation/multiview.py", "evaluation/render.py",
+    "evaluation/render_artifacts.py",
     "evaluation/geometry.py", "examples/prepare_gso_inventory.py",
     "wt/artifacts.py", "wt/experiment.py", "wt/paths.py",
     "scripts/setup_multiview.py", "requirements.recovery.txt", "requirements.lock.txt",
@@ -223,8 +224,8 @@ class Evaluator:
                     else:
                         rows.extend({
                             "protocol_id": protocol, "metric": name, "value": None, "unit": unit,
-                            "status": "N/A", "reason": "WT provides raw points", "valid_views": 0, "total_views": 4,
-                        } for name, unit in METRIC_UNITS.items())
+                            "status": "N/A", "reason": "WT provides raw points", "valid_views": 0, "total_views": len(gt["cameras"]),
+                        } for name, unit in multiview_metric_units(self.config).items())
                 result = {
                     "status": "complete", "signature": signature, "revision": self.revision,
                     "run_directory": str(directory), "sample_id": sample["sample_id"], "method": state["method"],
@@ -307,7 +308,7 @@ def summarize(records, planned_runs, config):
         for group, items in sorted(groups.items()):
             metadata = dict(zip(("method", "config_id", "seed", "parameter_hash"), group))
             metadata["source_config_hashes"] = sorted(source_hashes[group])
-            for name in METRIC_UNITS:
+            for name in multiview_metric_units(config):
                 selected = [(item["sample_id"], m) for item in items for m in item["metrics"]
                             if (m["protocol_id"], m["metric"]) == (protocol, name)]
                 values = [m["value"] for _, m in selected if m["status"] == "complete"]
@@ -329,7 +330,7 @@ def summarize(records, planned_runs, config):
         if group[0] == "wt":
             continue
         meshes = [item for item in items if "native" in item["comparisons"]]
-        for name in METRIC_UNITS:
+        for name in multiview_metric_units(config):
             differences, image_errors = [], []
             for item in meshes:
                 values = {route: {m["metric"]: m for m in comparison["metrics"]}

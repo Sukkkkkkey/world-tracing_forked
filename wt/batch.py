@@ -285,18 +285,22 @@ class InferenceBackend:
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
 
+    def prepare_wt_inputs(self, image, rgba, cfg):
+        from wt.data import preprocess_rgba_for_model
+        return preprocess_rgba_for_model(
+            rgba, image_size=self.model_cfg['image_size'], num_layers=6, center_crop=True,
+            alpha_erode_px=cfg['alpha_erode'], bg_color=tuple(cfg['bg_color']))
+
     def predict_wt(self, image, cfg, seed, directory):
         import numpy as np
         import torch
         from PIL import Image
-        from wt.data import load_rgba_image, preprocess_rgba_for_model
+        from wt.data import load_rgba_image
         from wt.inference import inference_diffusion, _bypass_activation_checkpointing
         self.reset_seed(seed)
         rgba = load_rgba_image(image, auto_alpha=True)
         Image.fromarray(rgba).save(directory / 'rgba.png')
-        rgb, mask, intrinsics = preprocess_rgba_for_model(rgba,
-            image_size=self.model_cfg['image_size'], num_layers=6, center_crop=True,
-            alpha_erode_px=cfg['alpha_erode'], bg_color=tuple(cfg['bg_color']))
+        rgb, mask, intrinsics = self.prepare_wt_inputs(image, rgba, cfg)
         torch.manual_seed(seed)
         inference_cfg = {**self.model_cfg['inference_kwargs'], 'num_steps': cfg['wt_steps']}
         with torch.no_grad(), torch.autocast(device_type=self.device.type, dtype=torch.bfloat16,

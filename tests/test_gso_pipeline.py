@@ -13,7 +13,8 @@ from wt.experiment import atomic_json
 from wt.textured_mesh.canon import compute_canonical_transform
 
 
-def test_render_manifest_and_all_three_method_metrics(tmp_path):
+@pytest.mark.parametrize("dataset_name", ["gso-v1", "omniobject3d-ood-v1"])
+def test_render_manifest_and_all_three_method_metrics(tmp_path, dataset_name):
     import torch
     if not torch.cuda.is_available(): pytest.skip('CUDA required for pipeline contract')
     mesh=trimesh.creation.box(extents=[.7,.5,.9])
@@ -21,11 +22,12 @@ def test_render_manifest_and_all_three_method_metrics(tmp_path):
     dataset=tmp_path/'dataset';dataset.mkdir()
     (dataset/'inventory.jsonl').write_text(json.dumps(dict(asset_id='box',mesh=str(mesh_path),valid=True))+'\n')
     atomic_json(dataset/'split.json',dict(splits=dict(pilot=['box'])))
-    manifest=prepare(dataset,'pilot','z')
+    manifest=prepare(dataset,'pilot','z',dataset_name=dataset_name)
     sample=json.loads(manifest.read_text())
     dest=Path(sample['evaluation_dir'])
     # Resume validates artifact hashes instead of generating a different view.
-    assert prepare(dataset,'pilot','z') == manifest
+    assert prepare(dataset,'pilot','z',dataset_name=dataset_name) == manifest
+    assert sample['dataset'] == dataset_name
     camera=json.loads((dest/'camera.json').read_text())
     reference=trimesh.load(dest/'gt_camera.ply',process=False)
     tf=compute_canonical_transform(np.asarray(reference.vertices))

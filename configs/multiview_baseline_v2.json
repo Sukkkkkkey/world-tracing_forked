@@ -22,5 +22,8 @@
   "lpips_linear_sha256": "df73285e35b22355a2df87cdb6b70b343713b667eddbda73e1977e0c860835c0",
   "camera_layout": "sphere-hammersley",
   "view_count": 30,
-  "polar_offset": 0.5
+  "polar_offset": 0.5,
+  "depth_image_encoding": "gt_range_grayscale",
+  "image_metric_region": "full_frame",
+  "multiview_physical_depth_metrics": false
 }

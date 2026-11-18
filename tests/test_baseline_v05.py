@@ -289,6 +289,13 @@ def test_validation_recomputes_render_metrics_and_detects_mismatch():
     config = {"psnr_mse_floor": 1e-12}
     stored = frame_metrics(prediction, reference, config)
     check_frame_metrics(prediction, reference, stored, config)
+    for name in ("depth_absrel", "depth_delta1", "depth_delta2",
+                 "depth_image_rmse", "depth_image_psnr", "depth_image_lpips",
+                 "depth_image_clipped_fraction", "normal_rmse"):
+        stored["metrics"].pop(name)
+    check_frame_metrics(prediction, reference, stored, config)
+    stored.pop("image_metric_region")
+    check_frame_metrics(prediction, reference, stored, {**config, "image_metric_region": "full_frame"})
     stored["metrics"]["depth_mae"] += .01
     with pytest.raises(AssertionError):
         check_frame_metrics(prediction, reference, stored, config)

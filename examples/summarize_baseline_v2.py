@@ -299,19 +299,38 @@ def markdown(report):
             lines += table(groups, [(label, f"{prefix}.{metric}") for label, metric in
                                    (("CD-L1", "cd_euclidean_mean"), ("CD-L2", "cd_squared_mean"),
                                     ("F@0.01", "f@0.01"), ("F@0.05", "f@0.05"))])
-        for group, title in (("input", "输入视角"), ("multiview", "30 视角")):
-            lines += [f"### {title} · 共同 surfel 表示", ""]
-            lines += table(groups, [(label, f"surfel.{group}.{metric}") for label, metric in
-                                   (("深度 MAE", "depth_mae"), ("深度 RMSE", "depth_rmse"),
-                                    ("IoU", "silhouette_iou"),
-                                    ("法线角误差", "normal_mean_angle"), ("法线 LPIPS", "normal_lpips"),
-                                    ("深度覆盖", "depth_coverage"), ("法线覆盖", "normal_coverage"))])
-        lines += ["### 输入深度 SSI · 共同 surfel 表示", "",
-                  "在完整几何 Sim(3) 重渲染后，逐资产拟合深度的正尺度与标量偏移。"
-                  "覆盖率门槛为 95%，各项 n 为通过该门槛及拟合有效性检查的资产数。", ""]
-        lines += table(groups, [(label, f"surfel.input_ssi.{metric}") for label, metric in
-                               (("MAE", "mae"), ("RMSE", "rmse"), ("AbsRel", "absrel"),
-                                ("δ<1.25", "delta1"), ("δ<1.25²", "delta2"))])
+        depth_columns = (
+            ("MAE", "depth_mae"), ("RMSE", "depth_rmse"), ("AbsRel", "depth_absrel"),
+            ("δ1", "depth_delta1"), ("δ2", "depth_delta2"),
+        )
+        lines += ["### Visible depth · 共同 surfel 表示", "",
+                  "完整形状 Sim(3) 后，固定 GT 输入相机直接渲染并计算深度误差。", ""]
+        lines += table(groups, [(label, f"surfel.input.{metric}")
+                                for label, metric in depth_columns])
+        image_columns = (
+            ("深度图 RMSE", "depth_image_rmse"), ("深度图 PSNR", "depth_image_psnr"),
+            ("深度图 LPIPS", "depth_image_lpips"), ("深度覆盖", "depth_coverage"),
+        )
+        lines += ["### 输入视角 · 深度图、轮廓与法线", ""]
+        lines += table(groups, [(label, f"surfel.input.{metric}")
+                                for label, metric in image_columns])
+        lines += table(groups, [(label, f"surfel.input.{metric}") for label, metric in (
+            ("Silhouette IoU", "silhouette_iou"), ("法线角误差", "normal_mean_angle"),
+            ("法线图 RMSE", "normal_rmse"), ("法线 PSNR", "normal_psnr"),
+            ("法线 LPIPS", "normal_lpips"), ("法线覆盖", "normal_coverage"),
+        )])
+        lines += ["### 输入视角 · GLB 外观", ""]
+        lines += table([row for row in groups if row["stage"] == "glb"], [
+            ("RGB PSNR", "input_rgb.psnr"), ("RGB LPIPS", "input_rgb.lpips"),
+        ])
+        lines += ["### 30 视角 · 共同 surfel 表示", ""]
+        lines += table(groups, [(label, f"surfel.multiview.{metric}")
+                                for label, metric in image_columns])
+        lines += table(groups, [(label, f"surfel.multiview.{metric}") for label, metric in (
+            ("Silhouette IoU", "silhouette_iou"), ("法线角误差", "normal_mean_angle"),
+            ("法线图 RMSE", "normal_rmse"), ("法线 PSNR", "normal_psnr"),
+            ("法线 LPIPS", "normal_lpips"), ("法线覆盖", "normal_coverage"),
+        )])
         exported = [row for row in groups if row["stage"] == "glb"]
         if exported:
             lines += ["### 同 seed、同 decoded 变换的导出差值", "",
@@ -320,6 +339,19 @@ def markdown(report):
                 ("完整 CD-L1 Δ", "export_pair.delta.shape.cd_euclidean_mean"),
                 ("可见 CD-L1 Δ", "export_pair.delta.regions.visible.cd_euclidean_mean"),
                 ("面积/GT Δ", "export_pair.delta.geometry.area_gt_ratio")])
+    historical = [row for row in report["groups"] if row["mode"] in modes
+                  and any(name.startswith("surfel.input_ssi.") for name in row["metrics"])]
+    if historical:
+        lines += ["## 历史诊断 · Sim(3) 重渲染后 SSI", "",
+                  "记录逐资产再次拟合深度尺度与偏移的历史结果。"
+                  "覆盖率门槛为 95%，n 为通过覆盖率及拟合有效性检查的资产数。", ""]
+        for mode, title in modes.items():
+            groups = [row for row in historical if row["mode"] == mode]
+            if groups:
+                lines += [f"### {title}", ""]
+                lines += table(groups, [(label, f"surfel.input_ssi.{metric}") for label, metric in
+                                       (("MAE", "mae"), ("RMSE", "rmse"), ("AbsRel", "absrel"),
+                                        ("δ1", "delta1"), ("δ2", "delta2"))])
     lines += ["## 产物与解释条件", "",
               "主指标使用完整几何正 Sim(3) 配准，输入相机沿用 GT 裁剪内外参。"
               "区域划分复用该变换，预测点按最近 GT 评价点继承标签。"

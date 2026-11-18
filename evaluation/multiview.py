@@ -6,11 +6,20 @@ from scipy.spatial import cKDTree
 
 from evaluation.geometry import surface_points
 from evaluation.render import make_camera
+from evaluation.render_artifacts import depth_limits
 from examples.prepare_gso_inventory import asset_seed
 
 METRIC_UNITS = {
     "depth_mae": "GT_diagonal",
     "depth_rmse": "GT_diagonal",
+    "depth_absrel": "ratio",
+    "depth_delta1": "ratio",
+    "depth_delta2": "ratio",
+    "depth_image_rmse": "normalized_intensity",
+    "depth_image_psnr": "dB",
+    "depth_image_lpips": "distance",
+    "depth_image_clipped_fraction": "ratio",
+    "normal_rmse": "normalized_intensity",
     "silhouette_iou": "ratio",
     "depth_coverage": "ratio",
     "normal_mean_angle": "degree",
@@ -19,6 +28,13 @@ METRIC_UNITS = {
     "normal_coverage": "ratio",
     "normal_mse": "RGB_squared",
 }
+PHYSICAL_DEPTH_METRICS = {"depth_mae", "depth_rmse", "depth_absrel", "depth_delta1", "depth_delta2"}
+
+
+def multiview_metric_units(config):
+    include_depth = config.get("multiview_physical_depth_metrics", True)
+    return {name: unit for name, unit in METRIC_UNITS.items()
+            if include_depth or name not in PHYSICAL_DEPTH_METRICS}
 
 
 def cameras(input_camera, config):
@@ -183,52 +199,149 @@ class NormalLPIPS:
         self.model = lpips.LPIPS(net="alex", version="0.1", verbose=False).to(device).eval()
 
     def __call__(self, prediction, reference):
+        return float(self.batch(prediction[None], reference[None])[0])
+
+    def batch(self, prediction, reference):
+        """Score NHWC RGB arrays encoded in [-1, 1]."""
         torch = self.torch
-        # Camera normals are exactly the [-1, 1] encoding of normal RGB.
-        a = torch.as_tensor(prediction.transpose(2, 0, 1).copy(), device=self.device)[None]
-        b = torch.as_tensor(reference.transpose(2, 0, 1).copy(), device=self.device)[None]
+        a = torch.as_tensor(np.ascontiguousarray(prediction.transpose(0, 3, 1, 2)),
+                            dtype=torch.float32, device=self.device)
+        b = torch.as_tensor(np.ascontiguousarray(reference.transpose(0, 3, 1, 2)),
+                            dtype=torch.float32, device=self.device)
         with torch.inference_mode():
-            return float(self.model(a, b).item())
+            return self.model(a, b).flatten().cpu().numpy()
 
 
-def frame_metrics(prediction, reference, config, lpips_model=None):
+def depth_image_comparison(prediction, reference, config):
+    """Encode both depth maps using the same GT limits and compute image errors."""
+    if config.get("depth_image_encoding", "gt_range_grayscale") != "gt_range_grayscale":
+        raise ValueError("Unsupported depth image encoding")
+    p = prediction["mask"] & np.isfinite(prediction["depth"]) & (prediction["depth"] > 0)
+    g = reference["mask"] & np.isfinite(reference["depth"]) & (reference["depth"] > 0)
+    low, high = depth_limits(reference)
+    images = []
+    for frame, valid in ((prediction, p), (reference, g)):
+        depth = np.where(valid, frame["depth"], (low + high) / 2).astype(np.float64)
+        gray = np.clip((depth - low) / (high - low), 0, 1)
+        gray[~valid] = .5
+        images.append(np.repeat((gray * 2 - 1)[..., None], 3, axis=-1).astype(np.float32))
+    metrics = {"depth_image_rmse": None, "depth_image_psnr": None, "depth_image_lpips": None}
+    overlap = p & g
+    region = config.get("image_metric_region", "valid_intersection")
+    if region == "full_frame":
+        difference = (images[0].astype(np.float64) - images[1]) / 2
+    elif region == "valid_intersection":
+        difference = (images[0][overlap].astype(np.float64) - images[1][overlap]) / 2
+    else:
+        raise ValueError(f"Unsupported image metric region: {region}")
+    if difference.size:
+        mse = float(np.mean(difference ** 2))
+        metrics.update(depth_image_rmse=float(np.sqrt(mse)),
+                       depth_image_psnr=float(-10 * np.log10(max(mse, config["psnr_mse_floor"]))))
+    clipped = p & ((prediction["depth"] < low) | (prediction["depth"] > high))
+    metrics["depth_image_clipped_fraction"] = float(clipped.sum() / p.sum()) if p.any() else None
+    return {
+        "metrics": metrics, "prediction_rgb": images[0], "reference_rgb": images[1],
+        "encoding": {"depth_limits_D": [low, high], "background_intensity": .5,
+                     "metric_region": region,
+                     "pred_valid_pixels": int(p.sum()), "pred_clipped_pixels": int(clipped.sum()),
+                     "pred_clipped_fraction": float(clipped.sum() / p.sum()) if p.any() else None},
+    }
+
+
+def normal_image_comparison(prediction, reference, config):
+    """Compare normal RGB images with an explicit averaging domain."""
+    p = (prediction["mask"] & np.isfinite(prediction["depth"]) & (prediction["depth"] > 0)
+         & prediction["normal_valid"])
+    g = (reference["mask"] & np.isfinite(reference["depth"]) & (reference["depth"] > 0)
+         & reference["normal_valid"])
+    a = np.where(p[..., None], prediction["normals"], 0).astype(np.float32)
+    b = np.where(g[..., None], reference["normals"], 0).astype(np.float32)
+    region = config.get("image_metric_region", "valid_intersection")
+    if region == "full_frame":
+        difference = (a.astype(np.float64) - b) / 2
+    elif region == "valid_intersection":
+        left = prediction["normals"][p & g].astype(np.float64)
+        right = reference["normals"][p & g].astype(np.float64)
+        left /= np.linalg.norm(left, axis=1, keepdims=True)
+        right /= np.linalg.norm(right, axis=1, keepdims=True)
+        difference = (left - right) / 2
+    else:
+        raise ValueError(f"Unsupported image metric region: {region}")
+    metrics = {"normal_mse": None, "normal_rmse": None, "normal_psnr": None}
+    if difference.size:
+        mse = float(np.mean(difference ** 2))
+        metrics.update(normal_mse=mse, normal_rmse=float(np.sqrt(mse)),
+                       normal_psnr=float(-10 * np.log10(max(mse, config["psnr_mse_floor"]))))
+    return {"metrics": metrics, "prediction_rgb": a, "reference_rgb": b}
+
+
+def depth_frame_metrics(prediction, reference):
+    """Score fixed-camera depth arrays on their finite positive mask intersection."""
     p = prediction["mask"] & np.isfinite(prediction["depth"]) & (prediction["depth"] > 0)
     g = reference["mask"] & np.isfinite(reference["depth"]) & (reference["depth"] > 0)
     if not np.any(g):
         raise ValueError("GT has no visible geometry")
     overlap, union = p & g, p | g
-    normal_overlap = overlap & prediction["normal_valid"] & reference["normal_valid"]
     metrics = {
         "silhouette_iou": float(overlap.sum() / union.sum()),
         "depth_coverage": float(overlap.sum() / g.sum()),
-        "normal_coverage": float(normal_overlap.sum() / g.sum()),
-        "depth_mae": None, "depth_rmse": None,
-        "normal_mean_angle": None, "normal_psnr": None, "normal_mse": None,
-        "normal_lpips": None,
+        "depth_mae": None, "depth_rmse": None, "depth_absrel": None,
+        "depth_delta1": None, "depth_delta2": None,
     }
     if np.any(overlap):
-        error = (prediction["depth"][overlap].astype(np.float64) - reference["depth"][overlap])
-        metrics.update(depth_mae=float(np.abs(error).mean()),
-                       depth_rmse=float(np.sqrt(np.mean(error * error))))
+        predicted = prediction["depth"][overlap].astype(np.float64)
+        target = reference["depth"][overlap].astype(np.float64)
+        error = predicted - target
+        ratio = np.maximum(predicted / target, target / predicted)
+        metrics.update(
+            depth_mae=float(np.abs(error).mean()),
+            depth_rmse=float(np.sqrt(np.mean(error * error))),
+            depth_absrel=float((np.abs(error) / target).mean()),
+            depth_delta1=float((ratio < 1.25).mean()),
+            depth_delta2=float((ratio < 1.25 ** 2).mean()),
+        )
+    return {
+        "metrics": metrics,
+        "pixels": {"pred": int(p.sum()), "gt": int(g.sum()), "overlap": int(overlap.sum())},
+    }
+
+
+def frame_metrics(prediction, reference, config, lpips_model=None):
+    result = depth_frame_metrics(prediction, reference)
+    p = prediction["mask"] & np.isfinite(prediction["depth"]) & (prediction["depth"] > 0)
+    g = reference["mask"] & np.isfinite(reference["depth"]) & (reference["depth"] > 0)
+    normal_overlap = p & g & prediction["normal_valid"] & reference["normal_valid"]
+    metrics = result["metrics"]
+    image_comparison = depth_image_comparison(prediction, reference, config)
+    metrics.update(image_comparison["metrics"])
+    result["depth_image_encoding"] = image_comparison["encoding"]
+    result["image_metric_region"] = config.get("image_metric_region", "valid_intersection")
+    normal_comparison = normal_image_comparison(prediction, reference, config)
+    metrics.update(normal_comparison["metrics"])
+    metrics.update(
+        normal_coverage=float(normal_overlap.sum() / g.sum()),
+        normal_mean_angle=None, normal_lpips=None,
+    )
     if np.any(normal_overlap):
         a = prediction["normals"][normal_overlap].astype(np.float64)
         b = reference["normals"][normal_overlap].astype(np.float64)
         a /= np.linalg.norm(a, axis=1, keepdims=True)
         b /= np.linalg.norm(b, axis=1, keepdims=True)
         angles = np.arctan2(np.linalg.norm(np.cross(a, b), axis=1), np.sum(a * b, axis=1))
-        mse = float(np.mean(((a - b) / 2) ** 2))
-        metrics.update(normal_mean_angle=float(np.rad2deg(angles).mean()), normal_mse=mse,
-                       normal_psnr=float(-10 * np.log10(max(mse, config["psnr_mse_floor"]))))
+        metrics["normal_mean_angle"] = float(np.rad2deg(angles).mean())
     if lpips_model is not None:
-        a = np.where(prediction["normal_valid"][..., None] & p[..., None], prediction["normals"], 0)
-        b = np.where(reference["normal_valid"][..., None] & g[..., None], reference["normals"], 0)
-        metrics["normal_lpips"] = lpips_model(a.astype(np.float32), b.astype(np.float32))
-    return {
-        "metrics": metrics,
-        "pixels": {"pred": int(p.sum()), "gt": int(g.sum()), "overlap": int(overlap.sum()),
-                   "normal_overlap": int(normal_overlap.sum()),
-                   "pred_normal_valid": int((prediction["normal_valid"] & p).sum())},
-    }
+        metrics["normal_lpips"] = lpips_model(
+            normal_comparison["prediction_rgb"], normal_comparison["reference_rgb"],
+        )
+        metrics["depth_image_lpips"] = lpips_model(
+            image_comparison["prediction_rgb"], image_comparison["reference_rgb"],
+        )
+    result["pixels"].update(
+        normal_overlap=int(normal_overlap.sum()),
+        pred_normal_valid=int((prediction["normal_valid"] & p).sum()),
+    )
+    return result
 
 
 def compare_views(prediction, reference, config, lpips_model=None):
@@ -238,7 +351,7 @@ def compare_views(prediction, reference, config, lpips_model=None):
         g = {key: value[index] for key, value in reference.items()}
         views.append(frame_metrics(p, g, config, lpips_model))
     rows = []
-    for name, unit in METRIC_UNITS.items():
+    for name, unit in multiview_metric_units(config).items():
         values = [view["metrics"][name] for view in views]
         valid = [value for value in values if value is not None and np.isfinite(value)]
         complete = len(valid) == len(values)

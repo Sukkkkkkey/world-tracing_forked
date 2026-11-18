@@ -400,7 +400,8 @@ def test_parser_rejects_ignored_entity_arguments(tmp_path):
 
 
 @pytest.mark.parametrize('stop_signal,batch', [('SIGINT', False), ('SIGTERM', False),
-                                               ('SIGHUP', False), ('SIGTERM', True)])
+                                               ('SIGHUP', False), ('SIGTERM', True),
+                                               ('BUTTON', False), ('BUTTON', True)])
 def test_single_port_http_websocket_controls_and_shutdown(tmp_path, stop_signal, batch):
     import os
     import re
@@ -447,8 +448,10 @@ def test_single_port_http_websocket_controls_and_shutdown(tmp_path, stop_signal,
 
     with log.open('w') as stream:
         process = subprocess.Popen(command, stdout=stream, stderr=subprocess.STDOUT, env=env)
+    watcher = None
     try:
-        deadline = time.monotonic() + 20
+        # Imports on shared storage can lag while evaluation jobs are active.
+        deadline = time.monotonic() + 60
         while time.monotonic() < deadline:
             output = log.read_text()
             match = re.search(r'Viewer: (http://127.0.0.1:(\d+))', output)
@@ -457,6 +460,10 @@ def test_single_port_http_websocket_controls_and_shutdown(tmp_path, stop_signal,
             time.sleep(0.1)
         assert match, log.read_text()
         url, port = match[1], int(match[2])
+        if stop_signal == 'BUTTON':
+            watcher = subprocess.Popen([
+                sys.executable, '-B', str(Path(viewer.__file__).parent / 'scripts/wait_viewer_exit.py'),
+                '--pid', str(process.pid)], stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
         opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
         with opener.open(url, timeout=5) as response:
             html = response.read().decode()
@@ -534,11 +541,46 @@ def test_single_port_http_websocket_controls_and_shutdown(tmp_path, stop_signal,
             updates = []
             while not any(m['type'] == 'PointCloudMessage' for m in updates):
                 updates.extend(receive(ws))
-        process.send_signal(getattr(signal, stop_signal))
+            if stop_signal == 'BUTTON':
+                button = next(m for m in messages if m['type'] == 'GuiButtonMessage'
+                              and m['props']['label'] == '退出可视化')
+                for _ in range(2):
+                    ws.send(msgspec.msgpack.encode({'type': 'GuiUpdateMessage', 'uuid': button['uuid'],
+                                                   'updates': {'value': True}}))
+                shutdown = []
+                while not any(m['type'] == 'GuiUpdateMessage'
+                              and '正在结束当前查看器' in m.get('updates', {}).get('_markdown', '')
+                              for m in shutdown):
+                    shutdown.extend(receive(ws))
+        if stop_signal != 'BUTTON':
+            process.send_signal(getattr(signal, stop_signal))
         assert process.wait(timeout=10) == 0, log.read_text()
+        if watcher is not None:
+            assert watcher.wait(timeout=5) == 0, watcher.stdout.read().decode()
         with socket.socket() as probe:
             assert probe.connect_ex(('127.0.0.1', port)) != 0, 'Viewer port leaked after shutdown'
     finally:
         if process.poll() is None:
             process.kill()
             process.wait()
+        if watcher is not None and watcher.poll() is None:
+            watcher.kill()
+            watcher.wait()
+
+
+@pytest.mark.parametrize("states", [["initial", "initial", None], ["initial", "replacement"], [None]])
+def test_forwarding_waiter_tracks_process_identity(monkeypatch, states):
+    from scripts import wait_viewer_exit
+    remaining = iter(states)
+    monkeypatch.setattr(wait_viewer_exit, "process_start", lambda pid: next(remaining))
+    monkeypatch.setattr(Path, "read_bytes", lambda path: b"python\0viewer.py\0")
+    monkeypatch.setattr(wait_viewer_exit.time, "sleep", lambda seconds: None)
+    wait_viewer_exit.wait_viewer_exit(123)
+
+
+def test_forwarding_waiter_rejects_an_unrelated_process(monkeypatch):
+    from scripts import wait_viewer_exit
+    monkeypatch.setattr(wait_viewer_exit, "process_start", lambda pid: "initial")
+    monkeypatch.setattr(Path, "read_bytes", lambda path: b"python\0training.py\0")
+    with pytest.raises(ValueError, match="viewer.py"):
+        wait_viewer_exit.wait_viewer_exit(123)

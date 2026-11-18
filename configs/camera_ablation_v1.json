@@ -1,0 +1,31 @@
+{
+  "version": "camera-ablation-v1",
+  "run_id": "20261112-camera-v1",
+  "baseline_commit": "06e2335490c6b734fa854de0c53f05d873260105",
+  "publication_record": "/mnt/cpfs1/shuqiliu/code/world_tracing/.runtime/logs/camera-ablation-20261112/publication.json",
+  "calibration_report": "/mnt/cpfs1/shuqiliu/code/world_tracing/.runtime/logs/camera-ablation-20261112/calibration-audit.json",
+  "seed": 42,
+  "batch_size": 5,
+  "conditions": [
+    "A0",
+    "A1",
+    "B0",
+    "B1"
+  ],
+  "data_subdirectory": "camera-ablation/20261112-v1",
+  "datasets": {
+    "GSO": {
+      "source": "gso/v1",
+      "control_experiment": "20261013-R2-gso-quant-v1"
+    },
+    "OOD": {
+      "source": "omniobject3d/ood-v2",
+      "control_experiment": "20261112-OOD-omni-v2-eval100"
+    }
+  },
+  "memory_policy": "historical-v6-independent-row-topology-cache-release",
+  "artifact_policy": {
+    "npz_views": 31,
+    "png_views": "input-only"
+  }
+}

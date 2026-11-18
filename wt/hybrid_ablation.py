@@ -241,7 +241,7 @@ def save_plan(path, plan):
 
 def assert_camera_idle(proc=Path("/proc")):
     """Refuse concurrent GPU work; inspecting /proc creates no CUDA context."""
-    markers = ("run_camera_ablation_modelwise", "run_camera_ablation_parallel_pipeline",
+    markers = ("run_camera_ablation_overlap", "run_camera_ablation_modelwise", "run_camera_ablation_parallel_pipeline",
                "run_camera_ablation_pipeline", "run_camera_ablation_batch",
                "run_camera_parallel_evaluation", "continue_camera_ablation",
                "examples.prepare_camera_ablation")

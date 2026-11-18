@@ -334,14 +334,26 @@ class InferenceBackend:
         coords, count = v4_ray_fill(xyz, mask, tf.apply, res=resolution, ray_steps=cfg['ray_steps'])
         return tf, coords, count
 
+    def hybrid_mesh(self, parent, cfg, params):
+        import numpy as np
+        from PIL import Image
+        from wt.textured_mesh import inject_coords_into_trellis2, sparse_structure_resolution
+        with np.load(parent / 'prediction.npz', allow_pickle=False) as data:
+            xyz, mask = data['xyz'], data['mask']
+        resolution = sparse_structure_resolution(cfg['pipeline_type'])
+        tf, coords, count = self.hybrid_structure(xyz, mask, cfg, resolution)
+        with Image.open(parent / 'rgba.png') as source:
+            meshes = inject_coords_into_trellis2(self.pipeline, source.copy(), coords,
+                                                ss_res=resolution, **params)
+        return meshes, dict(canonical_transform=tf.to_dict(), ss_res=resolution, injected_voxels=count)
+
     def generate_mesh(self, image, cfg, seed, directory, parent):
         if (cfg['method'] == 'trellis2') != (parent is None):
             raise ValueError('Native TRELLIS requires no WT parent; hybrid requires one')
-        import numpy as np
         import torch
         import trimesh
         from PIL import Image
-        from wt.textured_mesh import inject_coords_into_trellis2, save_mesh_glb, sparse_structure_resolution
+        from wt.textured_mesh import save_mesh_glb
         self.reset_seed(seed)
         params = dict(seed=seed, pipeline_type=cfg['pipeline_type'],
             shape_slat_sampler_params={'steps': cfg['shape_steps']},
@@ -352,14 +364,8 @@ class InferenceBackend:
                 with Image.open(image) as source:
                     meshes = self.pipeline.run(source.copy(), **params)
             else:
-                with np.load(parent / 'prediction.npz', allow_pickle=False) as data:
-                    xyz, mask = data['xyz'], data['mask']
-                resolution = sparse_structure_resolution(cfg['pipeline_type'])
-                tf, coords, count = self.hybrid_structure(xyz, mask, cfg, resolution)
-                with Image.open(parent / 'rgba.png') as source:
-                    meshes = inject_coords_into_trellis2(self.pipeline, source.copy(), coords,
-                                                        ss_res=resolution, **params)
-                metadata.update(canonical_transform=tf.to_dict(), ss_res=resolution, injected_voxels=count)
+                meshes, info = self.hybrid_mesh(parent, cfg, params)
+                metadata.update(info)
             mesh = meshes[0]
             trimesh.Trimesh(mesh.vertices.detach().cpu().numpy(), mesh.faces.detach().cpu().numpy(),
                            process=False).export(directory / 'decoded_mesh.ply')

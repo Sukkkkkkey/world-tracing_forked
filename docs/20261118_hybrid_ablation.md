@@ -111,6 +111,14 @@ GPU 命令没有默认执行或自动排队。失败产物保留，拒绝原地�
 
 CPU 检查使用 `CUDA_VISIBLE_DEVICES=`，并将 OMP/MKL/OpenBLAS 线程数限制为 1；覆盖空集/边界/孔洞/邻域、默认路径等价、B1 冻结处理、完整矩阵和合成 480 次执行、续跑损坏检测及官方指标分流。最终 50 项测试通过（79.01 秒），日志为 `.runtime/logs/hybrid-ablation-20261118/cpu-smoke-reviewed.log`。真实 TRELLIS 数值表现、GPU 峰值和完整评测指标尚未验证；跨相机共同可见区域配对与 bootstrap 汇总在预实验分析阶段复用既有分析口径。
 
+## 单进程多资产 batch（独立 worktree）
+
+在 `codex/hybrid-batch-size` 的项目根目录使用 `python -m scripts.run_hybrid_ablation run --plan <plan.json> --execute-gpu --batch-size 2`。默认 batch size 为 1。worktree 可复用主仓的 Python 环境与 TRELLIS.2 依赖，设置 `WT_ENV_ROOT`、`WT_TRELLIS2_ROOT` 后加载本 worktree 的 `scripts/env.sh`。比较不同 batch size 时分别生成指向独立输出根的计划。
+
+每批属于同一数据集、相机、预处理和体素化配置。每个资产使用自己的冻结 WT parent、canonical transform、B1 裁剪和 seed。图像编码按分辨率各运行一次，稀疏坐标首列保存 batch index。512 shape、1024 shape、texture 三段各自在一份模型上执行整批扩散，支持每个资产不同的 voxel/token 数。噪声使用各资产自己的 CPU generator，并按上游单样本顺序跨阶段推进；解码前恢复对应资产的 CPU 随机状态。高分辨率 mesh 解码、GLB 烘焙和导出逐资产执行，保留原有显存保护。真实 GPU 内核的数值误差、吞吐及显存峰值待测。
+
+配置记录请求和实际 batch size 以及有序成员。尾批按实际数量运行；同一批部分成员已有完整结果时，保留原始同批条件，只补写缺失结果。runtime 同时记录共享采样耗时、单样本解码与写入耗时，汇总时共享时间只计一次。批采样的 allocated/reserved 峰值按批记录在成员 GPU 日志中，不能跨成员相加。OOM 会记录受影响成员，继续后续批，最终返回非零状态；已写入的失败或不完整目录按原有续跑规则保留。不同 batch 配置产生不同运行标识。
+
 ## 核对来源
 
 - 代码：`wt/textured_mesh/voxelise.py`、`wt/textured_mesh/pipeline.py`、`wt/batch.py`；级联行为见 `dependencies/TRELLIS.2/trellis2/pipelines/trellis2_image_to_3d.py`。

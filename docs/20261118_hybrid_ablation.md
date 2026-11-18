@@ -1,6 +1,6 @@
 # Hybrid 体素化消融方案
 
-2026-11-18；状态：已确认 20 资产预实验口径；仅更新方案与预算，未选定具体样本、未实现对照、未启动实验。核对基于远程工作区（HEAD `908457206d908c9d6ab52ff3f10e3ce1b1d89d4b`，含已有未提交改动）。
+2026-11-18；状态：20 资产预实验口径已确认，H-surface/H-band 和独立运行入口已实现；本轮只做合成数据 CPU smoke/回归，未选定具体样本、未启动真实推理或评测。实现前工作区已以 `fd2dd96f939aaa999ace215a9adc91f015d5a835`（`camera and hybrid ablation in progress`）推送；本节实现为其后的工作区改动。
 
 ## 目的与固定条件
 
@@ -30,9 +30,9 @@ GSO、OOD 分别从当前 camera_ablation 的固定 50 资产清单中选 20 个
 
 每数据集正式 100 资产仍采用原冻结 eval100，包含预实验的 20 个。配置冻结后，分别报告这 20 个配置选择样本、其余 80 个未参与本轮选配的样本和全部 100 个；不把含选配样本的全量汇总称为完全独立验证。当前 camera_ablation 范围保持 50，不因本方案扩大或重排其队列。
 
-## 两个对照的代码逻辑（仅设计）
+## 两个对照的代码逻辑（已实现）
 
-共同入口保持 `wt/batch.py::generate_mesh` 的数据读取与后续采样/导出流程，仅替换 `v4_ray_fill` 生成 coords 的部分：
+共同入口保持 `wt/batch.py::generate_mesh` 的数据读取与后续采样/导出流程；新增 `hybrid_structure` 钩子，默认仍调用原 `v4_ray_fill`，独立后端用 `surface_voxels` 替换 coords 生成：
 
 | 组别 | 坐标生成逻辑 |
 | --- | --- |
@@ -42,7 +42,7 @@ GSO、OOD 分别从当前 camera_ablation 的固定 50 资产清单中选 20 个
 
 两组均按 `argwhere` 的字典序输出唯一 int32 coords，保持批次索引 0；空集记失败，不悄悄退回官方方案。不增加随机采样或 voxel/token 截断。半径 1 在 canonical 坐标中对应一个 1/32 网格步长；不按资产调参。局部膨胀仍可能连接相隔很近的表面，需作为限制报告。
 
-注意：只设置 `ray_steps=0, close_iters=0` 仍会执行现有函数末尾的 `binary_fill_holes`，不能实现 H-surface。新逻辑将来须显式绕过该步骤。
+注意：只设置 `ray_steps=0, close_iters=0` 仍会执行现有函数末尾的 `binary_fill_holes`，不能实现 H-surface。已实现的 `surface_voxels` 显式绕过该步骤。
 
 H-fill 对 H-surface 检验整个填充组合，不能单独归因于 ray interpolation；H-band 对 H-surface 检验局部加厚的作用。支撑数量变化会改变随机张量形状，同 seed 不意味着逐 voxel 噪声一一相同。
 
@@ -86,9 +86,30 @@ H-fill 复用 `O/experiments/20261112-camera-v1-{GSO,OOD}-{A0,A1,B1}` 中 `wt_tr
 
 **调度预算：H-surface 与 H-band 各按独占一张 80GB 卡、单进程/单资产估算，两组串行共用同一张卡；尚无新对照峰值实测，不承诺 80GB 可覆盖所有资产。** 沿用已有分块/缓存释放策略与 `expandable_segments:True`，但不修改正在运行的 camera 进程或环境。
 
-并发余量按历史峰值计算：80 − 76.36 = 3.64 GiB；再预留 8 GiB 安全余量后为 −4.36 GiB，无法给新 Hybrid 提供可靠预算。即使某时段显存够用，同卡计算、CPU 和存储竞争仍可能拖慢 camera。故本轮只读日志与编写文档；GPU 小试及全量运行均等 camera 队列终态且进程退出后再安排，若必须重叠则需独立资源。
+并发余量按历史峰值计算：80 − 76.36 = 3.64 GiB；再预留 8 GiB 安全余量后为 −4.36 GiB，无法给新 Hybrid 提供可靠预算。即使某时段显存够用，同卡计算、CPU 和存储竞争仍可能拖慢 camera。故本轮只执行 CPU 合成 smoke/回归并更新代码与文档；GPU 小试及全量运行均等 camera 队列终态且进程退出后再安排，若必须重叠则需独立资源。
 
-后续实现后的显存小试优先从冻结的 20 资产中覆盖普通与复杂几何样本，分别记录 PyTorch allocated/reserved 和整卡峰值，再确定实际运行上限；如需额外资源压力样本，单列且不加入选配指标。超预算不临时降分辨率、减步数或改 seed，以免改变消融定义。
+后续 GPU 显存小试优先从冻结的 20 资产中覆盖普通与复杂几何样本，分别记录 PyTorch allocated/reserved 和整卡峰值，再确定实际运行上限；如需额外资源压力样本，单列且不加入选配指标。超预算不临时降分辨率、减步数或改 seed，以免改变消融定义。
+
+## 实现入口与验证边界
+
+- `wt/textured_mesh/voxelise.py::surface_voxels`：无填充表面量化与单步六邻域窄带；默认官方路径保持原数值逻辑。
+- `wt/hybrid_ablation_backend.py`：继承现有相机及显存适配器，复用确切 parent/transform；不加载 WT 或 Stage 1；记录 voxel 数、cascade token 数、耗时和 PyTorch allocated/reserved 峰值。整卡峰值仍需后续外部采样。
+- `wt/hybrid_ablation.py`、`scripts/run_hybrid_ablation.py`：冻结 720 项矩阵及 240 份官方来源摘要，只串行生成 480 个新结果；校验模型描述、依赖和数值环境，拒绝改动来源或不一致续跑。官方指标仅引用同 revision、来源与输入摘要一致的已有结果；缺失则停止，不补跑官方组。
+
+先准备选样 JSON：`selection_basis="geometry_diversity"`、`camera_plan_sha256`，以及 `datasets.GSO` / `datasets.OOD` 各 20 条 `{sample_id, geometry_tags, reason}`。名单必须属于当前冻结 50；程序校验成员、数量与描述，几何覆盖仍须人工审阅。只有所选相机/预处理官方推理齐备后才能生成计划；当前未冻结真实 20 样本计划。
+
+入口均在项目根目录使用 `.venv/bin/python -m scripts.run_hybrid_ablation`：
+
+| 子命令 | 参数与行为 |
+| --- | --- |
+| `plan` | `--camera-plan <modelwise50-v2/plan.json> --selection <selection.json> --root <O/experiments/独立目录> --out <plan.json>`；CPU 冻结计划，不准备输入、不运行模型。 |
+| `check` | `--plan <plan.json>`；CPU 核对计划及来源摘要。 |
+| `run` | `--plan <plan.json> --execute-gpu`；相机进程仍在运行则拒绝；独占、串行，仅运行两个新对照。默认设置本进程 `PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True`（不覆盖显式环境值）。 |
+| `evaluate` | `--plan <plan.json> --evaluation-config <既有兼容配置> --execute-gpu`；相同隔离检查，输出分数据集/相机的 decoded/GLB 指标索引；沿用 v0.5 evaluator。 |
+
+GPU 命令没有默认执行或自动排队。失败产物保留，拒绝原地覆盖；成功续跑逐项核验配置、parent 引用、输入记录及 mesh 摘要。单卡独占仍须调度保证，进程检查用于阻止已存在的 camera 队列，不能替代资源预留。
+
+CPU 检查使用 `CUDA_VISIBLE_DEVICES=`，并将 OMP/MKL/OpenBLAS 线程数限制为 1；覆盖空集/边界/孔洞/邻域、默认路径等价、B1 冻结处理、完整矩阵和合成 480 次执行、续跑损坏检测及官方指标分流。最终 50 项测试通过（79.01 秒），日志为 `.runtime/logs/hybrid-ablation-20261118/cpu-smoke-reviewed.log`。真实 TRELLIS 数值表现、GPU 峰值和完整评测指标尚未验证；跨相机共同可见区域配对与 bootstrap 汇总在预实验分析阶段复用既有分析口径。
 
 ## 核对来源
 

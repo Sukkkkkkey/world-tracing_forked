@@ -327,6 +327,13 @@ class InferenceBackend:
         self.pipeline = None
         self.recover()
 
+    def hybrid_structure(self, xyz, mask, cfg, resolution):
+        """Default geometry bridge; subclasses may replay an alternative support."""
+        from wt.textured_mesh import aggregate_camera_cloud, compute_canonical_transform, v4_ray_fill
+        tf = compute_canonical_transform(aggregate_camera_cloud(xyz, mask))
+        coords, count = v4_ray_fill(xyz, mask, tf.apply, res=resolution, ray_steps=cfg['ray_steps'])
+        return tf, coords, count
+
     def generate_mesh(self, image, cfg, seed, directory, parent):
         if (cfg['method'] == 'trellis2') != (parent is None):
             raise ValueError('Native TRELLIS requires no WT parent; hybrid requires one')
@@ -334,8 +341,7 @@ class InferenceBackend:
         import torch
         import trimesh
         from PIL import Image
-        from wt.textured_mesh import (aggregate_camera_cloud, compute_canonical_transform,
-            v4_ray_fill, inject_coords_into_trellis2, save_mesh_glb, sparse_structure_resolution)
+        from wt.textured_mesh import inject_coords_into_trellis2, save_mesh_glb, sparse_structure_resolution
         self.reset_seed(seed)
         params = dict(seed=seed, pipeline_type=cfg['pipeline_type'],
             shape_slat_sampler_params={'steps': cfg['shape_steps']},
@@ -348,9 +354,8 @@ class InferenceBackend:
             else:
                 with np.load(parent / 'prediction.npz', allow_pickle=False) as data:
                     xyz, mask = data['xyz'], data['mask']
-                tf = compute_canonical_transform(aggregate_camera_cloud(xyz, mask))
                 resolution = sparse_structure_resolution(cfg['pipeline_type'])
-                coords, count = v4_ray_fill(xyz, mask, tf.apply, res=resolution, ray_steps=cfg['ray_steps'])
+                tf, coords, count = self.hybrid_structure(xyz, mask, cfg, resolution)
                 with Image.open(parent / 'rgba.png') as source:
                     meshes = inject_coords_into_trellis2(self.pipeline, source.copy(), coords,
                                                         ss_res=resolution, **params)

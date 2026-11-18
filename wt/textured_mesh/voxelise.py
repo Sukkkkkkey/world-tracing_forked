@@ -149,7 +149,50 @@ def v4_ray_fill(
     return coords, n_raw
 
 
+def surface_voxels(
+    xyz: np.ndarray,
+    mask: np.ndarray,
+    canon_apply,
+    res: int = 32,
+    *,
+    band_radius: int = 0,
+) -> tuple[np.ndarray, int]:
+    """Quantise original surfaces, optionally adding one six-connected cell.
+
+    Unlike v4_ray_fill, neither mode interpolates rays, closes gaps, nor fills
+    interiors. The caller supplies the exact baseline canonical transform.
+    """
+    if type(res) is not int or res <= 0:
+        raise ValueError("res must be a positive integer")
+    if type(band_radius) is not int or band_radius not in (0, 1):
+        raise ValueError("band_radius must be 0 or 1")
+    cloud = expand_cloud_ray_xyz(xyz, mask, steps=0)
+    if not len(cloud):
+        return np.empty((0, 3), dtype=np.int32), 0
+    canonical = np.asarray(canon_apply(cloud))
+    if canonical.shape != cloud.shape:
+        raise ValueError("canonical transform changed point shape")
+    inside = np.isfinite(canonical).all(axis=1) & np.all(
+        np.abs(canonical) <= 0.5 - 1e-6, axis=1)
+    grid = _xyz_to_grid(canonical[inside], res)
+    if band_radius:
+        # Read only from the original grid: sequential in-place expansion would
+        # accidentally create diagonal cells or flood multiple grid steps.
+        expanded = grid.copy()
+        for axis in range(3):
+            lower = [slice(None)] * 3
+            upper = [slice(None)] * 3
+            lower[axis] = slice(None, -1)
+            upper[axis] = slice(1, None)
+            expanded[tuple(lower)] |= grid[tuple(upper)]
+            expanded[tuple(upper)] |= grid[tuple(lower)]
+        grid = expanded
+    coords = _grid_to_coords(grid)
+    return coords, len(coords)
+
+
 __all__ = [
     "expand_cloud_ray_xyz",
     "v4_ray_fill",
+    "surface_voxels",
 ]

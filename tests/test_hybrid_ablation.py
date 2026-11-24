@@ -176,7 +176,8 @@ def test_full_factorial_plan_reuses_exact_sources(pilot):
     validate_sources(plan)
     assert len(plan["jobs"]) == 720 and len(plan["sources"]) == 240
     assert sum(j["strategy"] != "fill" for j in plan["jobs"]) == 480
-    assert sum(len(v) for v in evaluation_candidates(plan).values()) == 1440
+    assert sum(len(v) for v in evaluation_candidates(plan).values()) == 720
+    assert {row["stage"] for rows in evaluation_candidates(plan).values() for row in rows} == {"glb"}
     for job in plan["jobs"]:
         if job["strategy"] == "fill":
             assert job["destination"] == plan["sources"][job["source_key"]]["source_directory"]
@@ -387,12 +388,12 @@ def test_mesh_adapter_preserves_frozen_camera_preprocessing(monkeypatch, tmp_pat
 
 
 def test_evaluation_routes_official_to_reuse_only(pilot, monkeypatch, tmp_path):
-    import examples.evaluate_baseline_v2 as evaluation
+    import evaluation.hybrid_glb as evaluation
     import scripts.run_hybrid_ablation as runner
     _, _, _, plan = pilot
     assert execute_plan(plan, FakeBackend, lambda: None) == 0
-    candidates = evaluation_candidates(plan)[("GSO", "A0")][:4]
-    assert [c["strategy"] for c in candidates] == ["fill", "fill", "surface", "surface"]
+    candidates = evaluation_candidates(plan)[("GSO", "A0")][:2]
+    assert [c["strategy"] for c in candidates] == ["fill", "surface"]
     calls, reuses = [], []
     def result(source, stage, directory):
         state = read_json(source / "run.json")
@@ -406,20 +407,20 @@ def test_evaluation_routes_official_to_reuse_only(pilot, monkeypatch, tmp_path):
             self.root = tmp_path / "metrics"
             self.config, self.revision, self.index_updates = {}, "cpu-fixture", []
         def evaluate(self, source, stage, name):
-            assert source == Path(candidates[2]["source_directory"])
+            assert source == Path(candidates[1]["source_directory"])
             calls.append(stage)
             return result(source, stage, self.root / "synthetic")
     def reuse(job, stage, revision):
         assert revision == "cpu-fixture"
         reuses.append(stage)
         return result(Path(job["source_directory"]), stage, tmp_path / "reused")
-    monkeypatch.setattr(evaluation, "BaselineEvaluator", Evaluator)
+    monkeypatch.setattr(evaluation, "HybridGlbEvaluator", Evaluator)
     monkeypatch.setattr(runner, "reuse_official_result", reuse)
     monkeypatch.setattr(runner, "evaluation_candidates", lambda p: {("GSO", "A0"): candidates})
     assert runner.evaluate_plan(plan, tmp_path / "config", lambda: None) == 0
-    assert calls == ["decoded", "glb"] and reuses == ["decoded", "glb"]
-    index = read_json(tmp_path / "metrics" / f"{Path(plan['root']).name}-GSO-A0" / "index.json")
-    assert len(index["results"]) == 4
+    assert calls == ["glb"] and reuses == ["glb"]
+    index = read_json(tmp_path / "metrics" / f"{Path(plan['root']).name}-GSO-A0-glb-only" / "index.json")
+    assert len(index["results"]) == 2
     validate_sources(plan)
     import torch
     assert not torch.cuda.is_initialized()

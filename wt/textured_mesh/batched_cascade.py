@@ -26,7 +26,9 @@ def pack_supports(supports, device):
             raise ValueError(f"Invalid 32-grid support for batch member {i}")
         column = np.full((len(xyz), 1), i, dtype=np.int32)
         packed.append(np.concatenate((column, xyz.astype(np.int32)), axis=1))
-    return torch.from_numpy(np.concatenate(packed)).to(device)
+    # argwhere-derived supports may be column-major. The sparse convolution kernel
+    # requires contiguous rows of [batch, x, y, z] on its first decoder call.
+    return torch.from_numpy(np.ascontiguousarray(np.concatenate(packed))).to(device)
 
 
 def noise_rows(lengths, channels, generators, device):
@@ -91,7 +93,7 @@ def sample_latents(pipeline, images, supports, seeds, cfg):
     del low, lr_cond
     # The upstream cascade stops at 1024 regardless of token count. Include
     # the batch column in unique() so coincident cells in two objects survive.
-    coords = torch.cat((up[:, :1], ((up[:, 1:] + 0.5) / 512 * (1024 // 16)).int()), 1).unique(dim=0)
+    coords = torch.cat((up[:, :1], ((up[:, 1:] + 0.5) / 512 * (1024 // 16)).int()), 1).unique(dim=0).contiguous()
     del up
     lengths = torch.bincount(coords[:, 0].long(), minlength=len(images)).tolist()
     if len(lengths) != len(images) or not all(lengths):

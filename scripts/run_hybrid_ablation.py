@@ -170,6 +170,10 @@ def finish_mesh(plan, backend, job, directory, identity, schedule, sampling_seco
         raise
 
 
+class MissingOfficialMetric(ValueError):
+    """The frozen source has no compatible completed metric for this stage."""
+
+
 def reuse_official_result(job, stage, revision):
     """Reference a compatible existing official metric; never recompute H-fill."""
     for experiment in job["evaluation_roots"]:
@@ -197,40 +201,63 @@ def reuse_official_result(job, stage, revision):
             if not result.get("inputs"):
                 raise ValueError("Official evaluation lacks input provenance")
             for name, checksum in result["inputs"].items():
+                if stage == "glb" and name == (result.get("export_pair") or {}).get("decoded_result"):
+                    continue
+                if stage == "glb" and Path(name).name == "decoded_mesh.ply":
+                    raise ValueError("Unexpected decoded mesh input in an official GLB result")
                 if file_digest(Path(name)) != checksum:
                     raise ValueError(f"Official evaluation input changed: {name}")
             return result
-    raise ValueError(f"No compatible official {stage} result; wait for camera evaluation: "
+    raise MissingOfficialMetric(f"No compatible official {stage} result; wait for camera evaluation: "
                      f"{job['dataset']}/{job['condition']}/{job['sample_id']}/{job['preprocessing']}")
 
 
-def evaluate_plan(plan, evaluation_config, idle_check=assert_camera_idle):
+def evaluate_plan(plan, evaluation_config=None, idle_check=assert_camera_idle):
     """Separate evaluation products; official inference artifacts remain read-only."""
     validate_plan(plan)
     validate_sources(plan)
     idle_check()
-    from examples.evaluate_baseline_v2 import BaselineEvaluator
+    from evaluation.hybrid_glb import HybridGlbEvaluator
     from scripts.run_ood_evaluation import index_row
-    evaluator = BaselineEvaluator(Path(evaluation_config))
+    contexts = {}
+    if evaluation_config is None:
+        camera_plan = Path(plan["camera_plan"])
+        if file_digest(camera_plan) != plan["camera_plan_sha256"]:
+            raise ValueError("Frozen camera plan changed")
+        contexts = {(c["dataset"], c["condition"]): c for c in read_json(camera_plan)["contexts"]}
     failures = 0
     for (dataset, condition), candidates in evaluation_candidates(plan).items():
-        name = f"{Path(plan['root']).name}-{dataset}-{condition}"
+        name = f"{Path(plan['root']).name}-{dataset}-{condition}-glb-only"
+        context = contexts.get((dataset, condition))
+        config_path = Path(context["evaluation_config"] if context else evaluation_config)
+        evaluator = HybridGlbEvaluator(config_path)
+        if context:
+            official = read_json(Path(context["root"]) / "baseline_evaluation.json")
+            if evaluator.revision != official["revision"]:
+                raise ValueError(f"Official evaluation revision mismatch: {dataset}/{condition}")
         output = evaluator.root / name
         output.mkdir(parents=True, exist_ok=True)
         report = {"config": evaluator.config, "selected_seeds": [42],
-                  "candidates": candidates, "mode": "fixed_seed", "plan_hash": plan["plan_hash"]}
+                  "evaluation_scope": "exported-glb-only-v1", "candidates": candidates, "mode": "fixed_seed", "plan_hash": plan["plan_hash"]}
         save_plan(output / "plan.json", report)
         rows = {}
+        missing_official = []
         for candidate in candidates:
             idle_check()
             directory = Path(candidate["source_directory"])
-            if read_json(directory / "run.json").get("status") != "complete":
-                raise ValueError(f"Finish mesh inference before evaluation: {directory}")
-            if candidate["strategy"] == "fill":
+            if not (directory / "run.json").exists() or read_json(directory / "run.json").get("status") != "complete":
+                result = evaluator.failed_candidate(candidate, name, "No complete inference GLB", "inference")
+            elif candidate["strategy"] == "fill":
                 job = next(j for j in plan["jobs"] if
                            (j["dataset"], j["condition"], j["sample_id"], j["config_id"], j["strategy"])
                            == (dataset, condition, candidate["sample_id"], candidate["config_id"], "fill"))
-                result = reuse_official_result(resolved_job(plan, job), candidate["stage"], evaluator.revision)
+                try:
+                    result = reuse_official_result(resolved_job(plan, job), candidate["stage"], evaluator.revision)
+                except MissingOfficialMetric as exc:
+                    missing_official.append(dict(candidate, status="unavailable", reason=str(exc)))
+                    failures += 1
+                    atomic_json(output / "missing_official.json", missing_official)
+                    continue
             else:
                 result = evaluator.evaluate(directory, candidate["stage"], name)
             for value in [*evaluator.index_updates, result]:
@@ -241,9 +268,27 @@ def evaluate_plan(plan, evaluation_config, idle_check=assert_camera_idle):
             failures += result["status"] != "complete"
             atomic_json(output / "index.json", dict(revision=evaluator.revision,
                 config=evaluator.config, results=list(rows.values()), plan_hash=plan["plan_hash"]))
+        atomic_json(output / "missing_official.json", missing_official)
+        del evaluator
         atomic_json(output / "ablation_groups.json", dict(dataset=dataset, condition=condition,
             candidates=candidates, selection=plan["selection"], plan_hash=plan["plan_hash"]))
     return failures
+
+
+def check_camera_evaluation_overlap(state_path):
+    """Allow an explicitly selected overlap controller in its evaluation-only phase."""
+    state = read_json(state_path)
+    if state.get("status") != "running":
+        return assert_camera_idle()
+    if (state.get("phase") != "evaluation" or state.get("inference_phase")
+            or state.get("external_worker") or state.get("external_workers")
+            or any(w.get("kind") != "eval" for w in state["active"])):
+        raise RuntimeError("Camera inference is active")
+    pid = int(state["controller_pid"])
+    args = Path(f"/proc/{pid}/cmdline").read_bytes().split(b"\0")
+    if (not any(Path(os.fsdecode(arg)).name == "run_camera_ablation_overlap.py" for arg in args)
+            or os.fsencode(str(state_path.resolve().parent)) not in args):
+        raise RuntimeError("Cannot confirm the selected camera evaluation controller")
 
 
 def main():
@@ -261,10 +306,12 @@ def main():
         p.add_argument("--plan", type=Path, required=True)
         p.add_argument("--execute-gpu", action="store_true")
         if name == "run":
+            p.add_argument("--overlap-camera-evaluation", type=Path, metavar="STATE_JSON",
+                           help="Allow concurrent camera evaluation after its inference has finished")
             p.add_argument("--batch-size", type=int, default=1,
                            help="Assets in a single batched Hybrid diffusion call (default: 1)")
         if name == "evaluate":
-            p.add_argument("--evaluation-config", type=Path, required=True)
+            p.add_argument("--evaluation-config", type=Path, help="Default: each group uses its frozen camera evaluation config")
     args = parser.parse_args()
     if args.command == "run" and args.batch_size < 1:
         parser.error("--batch-size must be positive")
@@ -283,7 +330,10 @@ def main():
         return 0
     # No dependency download, camera preparation, or WT inference is performed here.
     if args.command == "run":
-        return int(execute_plan(plan, batch_size=args.batch_size) != 0)
+        guard = assert_camera_idle
+        if args.overlap_camera_evaluation:
+            guard = lambda: check_camera_evaluation_overlap(args.overlap_camera_evaluation)
+        return int(execute_plan(plan, batch_size=args.batch_size, idle_check=guard) != 0)
     return int(evaluate_plan(plan, args.evaluation_config) != 0)
 
 

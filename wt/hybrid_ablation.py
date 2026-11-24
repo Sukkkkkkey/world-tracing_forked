@@ -170,7 +170,7 @@ def build_plan(camera_plan_path, selection_path, root):
                 camera_plan=str(camera_plan_path.resolve()),
                 camera_plan_sha256=file_digest(camera_plan_path),
                 selection_sha256=file_digest(selection_path), sources=sources, jobs=jobs,
-                budget=dict(outputs=720, reused_official=240, new_mesh=480, evaluation_stages=1440))
+                budget=dict(outputs=720, reused_official=240, new_mesh=480, evaluation_stages=720))
     plan["plan_hash"] = digest(plan)
     return plan
 
@@ -222,11 +222,10 @@ def evaluation_candidates(plan):
     for job in plan["jobs"]:
         key = (job["dataset"], job["condition"])
         rows = groups.setdefault(key, [])
-        for stage in ("decoded", "glb"):
-            rows.append(dict(sample_id=job["sample_id"], method="wt_trellis2",
-                config_id=job["config_id"], seed=42, stage=stage,
-                source_directory=job["destination"], strategy=job["strategy"],
-                preprocessing=job["preprocessing"]))
+        rows.append(dict(sample_id=job["sample_id"], method="wt_trellis2",
+            config_id=job["config_id"], seed=42, stage="glb",
+            source_directory=job["destination"], strategy=job["strategy"],
+            preprocessing=job["preprocessing"]))
     return groups
 
 
